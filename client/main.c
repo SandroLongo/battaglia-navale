@@ -10,19 +10,44 @@
 #define PORTNUMBER 25123
 #define BUF_DIM 512
 
+void stampa_griglia(griglia* g) {
+    printf("   ");
+    for (int c = 1; c <= 10; c++) {
+        printf("%2d ", c);
+    }
+    printf("\n");
+
+    for (int i = 0; i < 10; i++) {
+        printf("%c  ", 'A' + i);
+        for (int j = 0; j < 10; j++) {
+            if (g->disp[i][j].hit == 1) {
+                printf(" X ");
+            }
+            else if (g->disp[i][j].status == 1) {
+                printf(" O ");
+            }
+            else {
+                printf(" ~ ");
+            }
+        }
+        printf("\n");
+    }
+}
+
+
 //aleip : 192.168.1.106 (ipv4)
 // ip seli 87.20.233.29
 
-char struttura[10][10] = { 1,1,1,0,0,0,0,0,0,0,
-                           0,0,0,0,0,0,0,0,0,0,
-                           0,0,0,0,0,0,0,0,0,0, 
-                           0,0,0,0,0,0,0,0,0,0, 
-                           0,0,0,0,0,0,0,0,0,0, 
-                           0,0,0,0,0,0,0,0,0,0, 
-                           0,0,0,0,0,0,0,0,0,0, 
-                           0,0,0,0,0,0,0,0,0,0, 
-                           0,0,0,0,0,0,0,0,0,0, 
-                           0,0,0,0,0,0,0,0,0,0 };
+unsigned char struttura[10][10] = { 1,1,1,0,0,0,0,0,0,0,
+                                    0,0,0,0,0,0,0,0,0,0,
+                                    0,0,0,0,0,0,0,0,0,0, 
+                                    1,1,1,1,1,0,0,0,0,0, 
+                                    0,0,0,0,0,0,0,0,0,0, 
+                                    0,0,0,0,0,0,0,0,0,0, 
+                                    0,0,0,0,0,0,0,0,0,0, 
+                                    0,0,0,0,0,0,0,0,0,0, 
+                                    0,0,0,0,0,0,0,0,0,0, 
+                                    0,0,0,0,0,0,0,0,0,0 };
 
 typedef struct casella {
     unsigned char status; // presenza di acqua o nave (1 presenza di una parte di nave, 0 altrimenti)
@@ -40,7 +65,7 @@ struct casella creaCasellaVuota() {
     return new;
 }
 
-struct griglia* creaGrigliaVuota() {
+struct griglia creaGrigliaVuota() {
     struct griglia;
     struct casella disp[10][10];
     int i, j;
@@ -49,9 +74,29 @@ struct griglia* creaGrigliaVuota() {
             disp[i][j] = creaCasellaVuota();
         }
     }
+    return griglia;
 }
 
-unsigned richiedi_numero() //preso dalla slide 208 di calcolatori
+///void riempiGriglia(struct griglia *griglia, char disp[10][10]){}
+
+
+int  leggi_stringa(char* str)
+{
+    if (fgets(str, BUF_DIM , stdin) = NULL) {
+        size_t len = strlen(str);
+        if (len > 0 & str[len - 1] = '\n') {
+            str[len - 1] = '\0'; // Rimuove il carattere di newline
+        }
+        return 0;
+    }
+    else {
+        return 1;
+    }
+}
+
+
+
+unsigned long richiedi_numero() //preso dalla slide 208 di calcolatori (togliere prima di far vedere al professore)
 {
     unsigned long a;
     char buf[BUF_DIM];
@@ -130,6 +175,28 @@ SOCKET *socket_connection()
     return &ds_sock;
 }
 
+
+int manda_server(char* buff) {
+
+    send(ds_sock, buff, strlen(buff), 0);
+
+
+}
+
+
+
+
+int ricevi_server(char* buf) {
+	int bytes_received = recv(ds_sock, buf, BUF_DIM, 0);
+    if (bytes_received > 0) {
+        buf[bytes_received] = '\0';  // Assicurati di terminare la stringa
+        return 0;
+    }
+    else if (bytes_received == 0) return 1;
+
+}
+
+
 int main() {
     // Inizializzazione di Winsock
     WSADATA wsaData;
@@ -168,8 +235,29 @@ int main() {
     }
     printf("Connessione effettuata al server\n");
 
+    //decidi il nome
+    
+    richiedi_nome:
+    printf("inserisci il tuo nickname:");
+    if (leggi_stringa(buff)) goto richiedi_nome;
+    //seli scrivi la send
+    if (!ricevi_server(char* buf)) {
+        if (strcmp(buf, "ok")) {
+            goto richiedi_nome;
+        }
+    }
+    else {
+        printf("il server non risponde... riconnetersi\n");
+        goto connection:
+    }
+
+    printf("nome accettato\n");
+
+
+
+
     // Ciclo di invio e ricezione dei messaggi
-    unsigned codice;
+    unsigned long codice;
 
     while (1)
     {
@@ -220,3 +308,83 @@ int main() {
     chiudi_client(ds_sock, EXIT_SUCCESS);
     return 0;
 }
+
+
+/*
+ receive(&buffer)
+ if( strcmp(buffer[1],"2"){
+ //gestisci turno
+ else if (strcmp(buff[1], "1")){
+ //gestisci mossa
+ int = i+1
+ segnale
+ int = a +2
+ else if( strcmp(&buffer,"Hai vinto")
+ //fine partita
+ else if(strcmp(&buffer,"hai perso"){
+ ha vinto alessandro
+ return 
+
+
+ sigint(cntrl c){
+ //esce dalla partita
+ \
+|
+|
+|3
+\\\\\\\segnale()
+|4
+|
+|
+|
+ 6- quit (inteso che esce proprio dalla partita)
+ 
+1(A1)-->client buf[1]= 1->questa è una mossa
+
+
+
+
+
+
+*/
+
+/*
+REQUIREMENTS
+1-il client si connette al server e decide il nome
+2-decide se vuole entrare in una partita o chiudere il client
+3-entra nella partita                       (non posso scrivere)
+4-attesa che inizi la partita               (non posso scrivere)
+5-partita cominciata                        (non posso scrivere)
+6-disposizione navi                         (devo scrivere)
+7-attesa turno                              (leggo che succede)(posso scrivere->stampare griglie) 
+7a- ho perso (vedi eccezioni)
+8-scegli mossa/stampagriglia                (devo scrivere)
+8a- ho colpito torna al punto 8
+8b- non ho colpito torna al punto 7
+8c- ho vinto e torno al punto 2
+
+eccezioni
+1- arriva il messaggio dal server che ho perso(notizia_giocatore_eliminato dove idgiocatore = ilmioid), qui posso leggere solo cosa sta succedendo (posso scrivere)(leggo che succede)
+1a- arriva il segnale ctrl c e torno al punto 2
+
+
+(leggo che succede)--> aggiorno i dati sulle griglie dei giocatori
+(posso scrivere)--> stampogriglia/quit
+(devo scrivere)--> mossa/stampagriglia/quit
+
+costruzione messaggi per server (in partita, dal punto 5)
+mossa = 1+casella
+quitpartita = 2
+
+
+
+costruzione messaggi da server (in partita, dal punto 5)
+NOTIZIE
+notizia_mossa = 1+mossa+hit(o no)
+notizia_giocatoreeliminato = 2+idgiocatore( se id giocatore mio ho perso)
+notizia_turno = 3+idgiocatore
+notizia_vittoriagiocatore = 4+idgiocatore (ti passa al punto 2)
+notizia_attacco = 5+casella
+
+mossa = casella + idgiocatore
+*/
