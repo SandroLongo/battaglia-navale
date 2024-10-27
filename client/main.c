@@ -16,7 +16,7 @@ typedef struct casella {
 };
 
 typedef struct griglia {
-    struct casella disp[10][10] = ; //rappresentazione della griglia come matrice di caselle
+    struct casella disp[10][10]; //rappresentazione della griglia come matrice di caselle
 };
 
 int converti_input(const char* input, int* riga, int* colonna) { 
@@ -103,26 +103,6 @@ void initializeGrid(struct griglia* g) {
     }
 }
 
-struct casella creaCasellaVuota() {
-    struct casella new1;
-    new1.hit = 0;
-    new1.status = 0;
-    return new1;
-}
-
-struct griglia *creaGrigliaVuota() {
-    struct griglia;
-    struct casella disp[10][10];
-    int i, j;
-    for (i = 0; i < 10; i++) {
-        for (j = 0; j < 10; j++) {
-            disp[i][j] = creaCasellaVuota();
-        }
-    }
-    return griglia;
-}
-
-///void riempiGriglia(struct griglia *griglia, char disp[10][10]){}
 
 int inserisci_nave(struct griglia* griglia, unsigned dim, int riga, int colonna, char dir) {  //dir 1 = N, 2 = S, 3 = W, 4 = E
     int n, s, e, w;
