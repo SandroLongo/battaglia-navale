@@ -17,6 +17,7 @@ typedef struct casella {
 
 typedef struct griglia {
     struct casella disp[10][10]; //rappresentazione della griglia come matrice di caselle
+    char playerid[20];
 };
 
 int converti_input(const char* input, int* riga, int* colonna) { 
@@ -94,13 +95,14 @@ unsigned char struttura[10][10] = { 1,1,1,0,0,0,0,0,0,0,
                                     0,0,0,0,0,0,0,0,0,0 };
 
 
-void initializeGrid(struct griglia* g) {
+void initializeGrid(struct griglia* g, char *playerid) {
     for (int i = 0; i < 10; i++) {
         for (int j = 0; j < 10; j++) {
             g->disp[i][j].status = 0; // No ship
             g->disp[i][j].hit = 0;    // Not hit
         }
     }
+    g->playerid = playerid;
 }
 
 
@@ -378,13 +380,13 @@ int main() {
    Qui attenderò la risposta del server, per vedere se mi farà entrare o devo rimanere in attesa.
    */
    
-    
+    int controllo;
     cerco_di_entrare:   //da mettere controlli
     sleep(1);
     controllo = ricevi_server(ds_sock, buff_receive);
     
     /*
-    il server può mandare che la lobby è gia piena, oppure che sono entrato in lobby e aspettiamo altri giocatori, inserisci_nave(struct griglia* griglia, unsigned dim, int riga, int colonna, int dir)
+    il server può mandare che la lobby è gia piena, oppure che sono entrato in lobby e aspettiamo altri giocatori, 
     */
     
     
@@ -410,11 +412,12 @@ int main() {
     
     
     printf("Disponi le tue navi!\n");
-    unsigned lista[5] = { 2,2,2,3,3,3,4 };
-    char** lista2[5] = { "corvetta", "corvetta", "corvetta", "sottomarino", "sottomarino", "sottomarino", "corazzata" };
-    struct my_griglia = creaGrigliaVuota();
+    unsigned lista[7] = { 2,2,2,3,3,3,4 };
+    char** lista2[7] = { "corvetta", "corvetta", "corvetta", "sottomarino", "sottomarino", "sottomarino", "corazzata" };
+    struct griglia my_griglia;
+    initializeGrid(&my_griglia, "");
     printf("per disporre le navi inserire la casella di partenza (lettera-numero) e la direzione verso cui la nave va disposta(N(su)E(destra)W(sinistra)S(giù))\n");
-    printf("esempio: A1 S")
+    printf("esempio: A1 S");
     int riga, colonna;
     for (int i = 0; i < 7; i++) {
         printf("inserisci %s (%u caselle)\n", lista2[i], lista[i]);
@@ -429,13 +432,13 @@ int main() {
     metti_dir:
         leggi_stringa(buff_receive);
         int length = strlen(buff_receive);
-        if (buff[0] != 'n' || buff[0] != 's' || buff[0] != 'w' || buff[0] != 'e' || length > 1) {
+        if (buff_receive[0] != 'n' || buff_receive[0] != 's' || buff_receive[0] != 'w' || buff_receive[0] != 'e' || length > 1) {
             printf("Scrivere una direzione valida.\n");
             goto metti_dir;
         }
 
 
-        if (inserisci_nave(&grigilia, lista[i], int riga, int colonna, buff[0]) != 0) {
+        if (inserisci_nave(&my_griglia, lista[i], int riga, int colonna, buff_receive[0]) != 0) {
             printf("L'inserimento della nave non è andato a buon fine,perfavore riprovare.\n");
             goto metti_casella;
         }
@@ -444,7 +447,15 @@ int main() {
     send(ds_sock, "completata");
     receive(ds_sock, buff_receive);
 
-    if(strcmp(buff_receive,))
+    if (strcmp(buff_receive, "iniziopartita")) {
+        printf("qualcosa è andato storto\n");
+        goto connection;
+    }
+
+    //partita inziata ufficialmente
+    struct 
+    //analisi di ricezione notizie
+    receive(ds_sock, buff_receive)
       
       
       
