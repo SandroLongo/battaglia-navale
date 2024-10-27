@@ -17,7 +17,8 @@ typedef struct casella {
 
 typedef struct griglia {
     struct casella disp[10][10]; //rappresentazione della griglia come matrice di caselle
-    char playerid[20];
+    char playerid[21];
+    int count;
 };
 
 int converti_input(const char* input, int* riga, int* colonna) { 
@@ -31,31 +32,31 @@ int converti_input(const char* input, int* riga, int* colonna) {
     *colonna = (input[1] == '1' && input[2] == '0') ? 9 : atoi(&input[1]) - 1;
 
     return 1;
-}
+}  
 
-int applica_attacco(struct casella griglia[10][10], int riga, int colonna) {
+int applica_attacco(struct griglia *g, int riga, int colonna) {
     // Controlla se la casella è già stata colpita
-    if (griglia[riga][colonna].hit == 1) {
+    if (g->disp[riga][colonna].hit == 1) {
         printf("Casella già colpita! Riprova.\n");
         return 1;
     }
     else {
 
-        if (griglia[riga][colonna].status == 1) { // C'è una nave
-            printf("Colpito!\n");
-            griglia[riga][colonna].hit = 1; // Segna la casella come colpita
+        if (g->disp[riga][colonna].status == 1) { // C'è una nave
+            g->disp[riga][colonna].hit = 1; // Segna la casella come colpita
+            g->count += 1;
             return 2;
         }
         else { // Non c'è una nave
-            printf("Miss!\n");
-            griglia[riga][colonna].hit = 1; // Anche se non è colpita, la casella è ora colpita
+            g->disp[riga][colonna].hit = 1; // Anche se non è colpita, la casella è ora colpita
             return 3;
         }
     }
 }
 
 
-void stampa_griglia(griglia* g) {
+void stampa_griglia(struct griglia* g) {
+    printf("%s\n", g->playerid);
     printf("   ");
     for (int c = 1; c <= 10; c++) {
         printf("%2d ", c);
@@ -66,13 +67,18 @@ void stampa_griglia(griglia* g) {
         printf("%c  ", 'A' + i);
         for (int j = 0; j < 10; j++) {
             if (g->disp[i][j].hit == 1) {
-                printf(" X ");
+                if (g->disp[i][j].status == 1) {  // hit = 1, status = 1 (una nave e colpita)
+                    printf(" X ");
+                }
+                else if {                         // hit = 1, status = 0 (acqua colpita)
+                    printf(" Ø ")
+                }  
             }
-            else if (g->disp[i][j].status == 1) {
-                printf(" O ");
+            else if (g->disp[i][j].status == 1) { //hit = 0, status = 1
+                printf(" = "); //ce la nostra nave
             }
             else {
-                printf(" ~ ");
+                printf(" ~ ");   //hit = 0, status = 0
             }
         }
         printf("\n");
@@ -103,6 +109,7 @@ void initializeGrid(struct griglia* g, char *playerid) {
         }
     }
     g->playerid = playerid;
+    g->count = 0;
 }
 
 
@@ -276,11 +283,11 @@ int main() {
     char buff_receive[BUF_DIM]; //(buf)
     //lancio della connessione
     SOCKET ds_sock;
-    connection:
+connection:
     ds_sock = *socket_connection();
     if (ds_sock == INVALID_SOCKET)
     {
-        richiesta_nuovo_tentativo:
+    richiesta_nuovo_tentativo:
         printf("la connessione con il server è fallita, riprovare?[Y/N]:");
         fgets(buff, BUF_DIM, stdin);
         buff[strcspn(buff, "\n")] = '\0';  // Rimuovi il newline
@@ -294,7 +301,7 @@ int main() {
             printf("chiusura del gioco...\n");
             chiudi_client(ds_sock, EXIT_SUCCESS);
         }
-        else 
+        else
         {
             printf("risposta non valida ripetere...\n");
             goto richiesta_nuovo_tentativo;
@@ -304,19 +311,19 @@ int main() {
     printf("Connessione effettuata al server\n");
 
     //decidi il nome
-    
-    richiedi_nome:
+
+richiedi_nome:
     printf("inserisci il tuo nickname:");
     if (leggi_stringa(buff_send)) goto richiedi_nome;
-    
+
     if (manda_server(ds_sock, buff_send) == -1) {
         printf("Errore nell'invio del nome al server. Riprova.\n");
         goto richiedi_nome;
     }
-    
-    
+
+
     if (!ricevi_server(ds_sock, buff_receive)) {
-        if (strcmp(buff, "ok")) { 
+        if (strcmp(buff, "ok")) {
             goto richiedi_nome;
         }
     }
@@ -326,8 +333,9 @@ int main() {
     }
 
     printf("nome accettato\n");
+    char* my_id = buff_send;
 
-
+richiedi_di_giocare:
     unsigned long scelta;
     do {
         printf("Scegli un'azione:\n1 - Entra in partita\n2 - Chiudi client\nScelta: ");
@@ -342,7 +350,7 @@ int main() {
     if (scelta == 1) {
         printf("Entrando in partita...\n");
         // Invio al server richiesta per entrare in partita
-        
+
         strcpy(buff_send, "entra_in_partita");
         unsigned int tentativi = 0;
         unsigned int max_tentativi = 3;
@@ -357,51 +365,52 @@ int main() {
             else if (controllo == 0) {
                 break;
             }
-        
-          
-        
+
+
+
         } while (tentativi < max_tentativi);
-        
+
         if (tentativi == max_tentativi) {
             printf("impossibile mandare il msg...riconnessione con il server.\n")
-            //chiudi_client(ds_sock, EXIT_FAILURE);
-            goto connect; //altrimenti possiamo chiudere la connessione con il server (e magari poi tentare di riconnetterci)
+                //chiudi_client(ds_sock, EXIT_FAILURE);
+                goto connect; //altrimenti possiamo chiudere la connessione con il server (e magari poi tentare di riconnetterci)
         }
-    
-  
-    
-    }else if (scelta == 2) {
+
+
+
+    }
+    else if (scelta == 2) {
         printf("Chiusura del client...\n");
         chiudi_client(ds_sock, EXIT_SUCCESS);
-     
+
     }
-   /*
-   se sono arrivato fino a qui significa che non voglio uscire dal gioco e ho mandato correttamente il msg 
-   Qui attenderò la risposta del server, per vedere se mi farà entrare o devo rimanere in attesa.
-   */
-   
+    /*
+    se sono arrivato fino a qui significa che non voglio uscire dal gioco e ho mandato correttamente il msg
+    Qui attenderò la risposta del server, per vedere se mi farà entrare o devo rimanere in attesa.
+    */
+
     int controllo;
-    cerco_di_entrare:   //da mettere controlli
+cerco_di_entrare:   //da mettere controlli
     sleep(1);
     controllo = ricevi_server(ds_sock, buff_receive);
-    
+
     /*
-    il server può mandare che la lobby è gia piena, oppure che sono entrato in lobby e aspettiamo altri giocatori, 
+    il server può mandare che la lobby è gia piena, oppure che sono entrato in lobby e aspettiamo altri giocatori,
     */
-    
-    
+
+
     if (strcmp(buff_receive, "entralobby") != 0 || controllo != 0) goto cerco_di_entrare;
-    
+
     //siamo in partita
     printf("in attesa di altri giocatori...\n");
-	controllo = ricevi_server(ds_sock, buff_receive);
+    controllo = ricevi_server(ds_sock, buff_receive);
     if (strcmp(buff_receive, "disposizione navi") != 0 || controllo != 0) {
         printf("qualcosa è andato storto\n");
         goto cerco_di_entrare;
     }
     //arrivano i nomi dei giocatori
     int num_giocatori;
-    receive(ds_sock,num_giocatori);
+    receive(ds_sock, num_giocatori);
     char** giocatori = malloc(sizeof(char*) * num_giocatori);
     int k;
     for (k = 0;k < num_giocatori;k++) {
@@ -409,13 +418,13 @@ int main() {
         strcpy(giocatori + k, buff_receive);
         printf("%s ", buff_receive);
     }
-    
-    
+
+
     printf("Disponi le tue navi!\n");
     unsigned lista[7] = { 2,2,2,3,3,3,4 };
     char** lista2[7] = { "corvetta", "corvetta", "corvetta", "sottomarino", "sottomarino", "sottomarino", "corazzata" };
     struct griglia my_griglia;
-    initializeGrid(&my_griglia, "");
+    initializeGrid(&my_griglia, "la mia griglia");
     printf("per disporre le navi inserire la casella di partenza (lettera-numero) e la direzione verso cui la nave va disposta(N(su)E(destra)W(sinistra)S(giù))\n");
     printf("esempio: A1 S");
     int riga, colonna;
@@ -453,9 +462,153 @@ int main() {
     }
 
     //partita inziata ufficialmente
-    struct 
+    struct griglia* lista_griglie = malloc(sizeof(struct griglia*) * num_giocatori);
+    for (int i = 0; i < num_giocatori; i++) {
+        initializeGrid(lista_griglie + i, giocatori[i]);
+    }
     //analisi di ricezione notizie
-    receive(ds_sock, buff_receive)
+    /*
+    costruzione messaggi da server (in partita, dal punto 5)
+    NOTIZIE
+    notizia_mossa = 1+casella+hit(o no)+idgiocatore
+    notizia_giocatoreeliminato = 2+idgiocatore( se id giocatore mio ho perso)
+    notizia_turno = 3+idgiocatore
+    notizia_vittoriagiocatore = 4+idgiocatore (ti passa al punto 2)
+    notizia_attacco = 5+casella
+    mossa = casella + idgiocatore*/
+
+    int a;
+    char* casella;
+    int colonna;
+    int riga;
+    int hit;
+    char* idgiocatore;
+    char* idgiocatore_corrente;
+    char* casella;
+    //int turno; //indice gicoatore che ha turno  da fare (sapere chi ha attaccato chi)
+ricezione_notizie:
+    ricevi_server(ds_sock, buff_receive);
+    a = atoi(buff_receive[0]);
+    switch (a) {
+    case 1:
+        ricevi_server(ds_sock, buff_receive); //ci arrvva la casella
+        converti_input(buff_receive, &riga, &colonna);
+        strcpy(casella, buff_receive) // salviamo la casella dove si vuole attaccare
+            ricevi_server(ds_sock, buff_receive); //ci arriva la hit
+        hit = atoi(buff_receive);
+        ricevi_server(ds_sock, buff_receive); //ci arriva id giocatore
+        strcpy(idgiocatore, buff_receive);
+        for (int i = 0; i < num_giocaotori; i++) {
+            if (strcmp(lista_griglie[i].idgiocatore, idgiocatore) == 0) {
+                lista_griglie[i].disp.hit = 1;
+                if (hit) {
+                    lista_griglie[i].disp.status = 1;
+                }
+                break;
+            }
+        }
+        printf("%s ha attaccato %s in %s e %sha colpito\n", idgiocatore_corrente, idgiocatore, casella, (hit == 1) ? "non " : "");
+        goto ricezione_notizie;
+    case 2:
+        ricevi_server(ds_sock, buff_receive);
+        printf("%s è stato eliminato, bye bye ? !\n", buff_receive);
+        goto ricezione_notizie;
+
+    case 3:
+        ricevi_server(ds_sock, buff_receive);
+        if (strcmp(buff_receive, my_id) == 0) {
+            goto gestione_turno;
+        }
+        strcpy(idgiocatore_corrente, buff_receive);
+        printf("é il tuorno di %s\n", idgiocatore_corrente);
+        goto ricezione_notizie;
+
+    case 4: // la partita è finita
+        ricevi_server(ds_sock, buff_receive);
+        if (strcmp(buff_receive, my_id) != 0) {
+            printf("Il giocatore %s ha vinto!\n");
+        }
+        else {
+            printf("Hai vinto!\n");
+        }
+
+        goto richiedi_di_giocare;
+
+
+    case 5:
+        int risultato;
+        ricevi_server(ds_sock, buff_receive);
+        converti_input(buff_receive, &riga, &colonna);
+        risultato = applica_attacco(&my_griglia, riga, colonna)
+            if (risultato == 2) {
+                if (my_griglia.count == 19) {
+                    printf("hai perso")!
+                        manda_server(ds_sock, "perso");
+                }
+            }
+        printf("Sei stato colpito!\n");
+
+        manda_server(ds_sock, "hit");
+
+            else {
+                manda_server(ds_sock, "miss");
+                printf("sei stato mancato!\n");
+            }
+
+        goto ricezione_notizie;
+
+
+    default:
+        goto ricezione_notizie;
+    }
+
+
+
+gestione_turno:
+    char* giocatore;
+    printf("E'il tuo turno! Scegli cosa vuoi fare.\n");
+scelta_azione:
+    printf("1-prepara mossa\n2-stampa griglie\n"); //da mettere anche l'opzione quit
+    unsigned long int numero = richiedi_numero(); //da mettere controlli
+    if (numero == 1) {
+        printf("scegli il giocatore da attaccare:");
+        leggi_stringa(buff_send);
+        for (int i = 0; i < num_giocatore; i++) {
+            if (strcmp(giocatori[i], buff_send) == 0) {
+                goto scelta_attacco;
+            }
+        }
+        printf("non esiste un giocatore con quel nome\n");
+        goto scelta_azione:
+    scelta_attacco:
+        printf("scegli una casella valida per l'attacco")
+            strcpy(giocatore, buff_send);
+        leggi_stringa(buff_send);
+        if (input[0] < 'A' || input[0] > 'J' || (input[1] < '1' || (input[1] > '9' && !(input[1] == '1' && input[2] == '0'))) || input[2] != '\0')) {
+            printf("l'input non è valido\n")
+                goto scelta_attacco;
+            }
+            strcpy(mossa, buff_send);
+            converti_input(mossa, &riga, &colonna);
+            for (int i = 0; i < num_giocatore; i++) {
+                if (strcmp(lista_griglie[i].idgiocatore, buff_send) == 0) {
+
+                    if (lista_griglia[i].disp[riga][colonna].hit == 1) {
+                        printf("la casella è gia stata attaccata\n");
+                        goto scelta_attacco;
+                    }
+                    break;
+                }
+            }
+            //la mossa è valida per l'attacco
+            manda_server(ds_sock, buff_send);
+
+
+
+    }
+
+}
+       
       
       
       
