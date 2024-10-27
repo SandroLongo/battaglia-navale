@@ -10,6 +10,15 @@
 #define PORTNUMBER 25123
 #define BUF_DIM 512
 
+typedef struct casella {
+    unsigned char status; // presenza di acqua o nave (1 presenza di una parte di nave, 0 altrimenti)
+    unsigned char hit;// nave colpita o meno (1 per colpita, 0 altrimenti)
+};
+
+typedef struct griglia {
+    struct casella disp[10][10] = ; //rappresentazione della griglia come matrice di caselle
+};
+
 int converti_input(const char* input, int* riga, int* colonna) { 
     if (input[0] < 'A' || input[0] > 'J' ||
         (input[1] < '1' || (input[1] > '9' && !(input[1] == '1' && input[2] == '0'))) || input[2] != '\0')) {
@@ -84,14 +93,15 @@ unsigned char struttura[10][10] = { 1,1,1,0,0,0,0,0,0,0,
                                     0,0,0,0,0,0,0,0,0,0, 
                                     0,0,0,0,0,0,0,0,0,0 };
 
-typedef struct casella {
-    unsigned char status; // presenza di acqua o nave (1 presenza di una parte di nave, 0 altrimenti)
-    unsigned char hit;// nave colpita o meno (1 per colpita, 0 altrimenti)
-};
 
-typedef struct griglia {
-    struct casella disp[10][10] = ; //rappresentazione della griglia come matrice di caselle
-};
+void initializeGrid(struct griglia* g) {
+    for (int i = 0; i < 10; i++) {
+        for (int j = 0; j < 10; j++) {
+            g->disp[i][j].status = 0; // No ship
+            g->disp[i][j].hit = 0;    // Not hit
+        }
+    }
+}
 
 struct casella creaCasellaVuota() {
     struct casella new1;
