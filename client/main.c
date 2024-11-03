@@ -462,7 +462,7 @@ cerco_di_entrare:   //da mettere controlli
     }
 
     //partita inziata ufficialmente
-    struct griglia* lista_griglie = malloc(sizeof(struct griglia*) * num_giocatori);
+    struct griglia* lista_griglie = malloc(sizeof(struct griglia) * num_giocatori);
     for (int i = 0; i < num_giocatori; i++) {
         initializeGrid(lista_griglie + i, giocatori[i]);
     }
@@ -511,7 +511,20 @@ ricezione_notizie:
         goto ricezione_notizie;
     case 2:
         ricevi_server(ds_sock, buff_receive);
-        printf("%s è stato eliminato, bye bye ? !\n", buff_receive);
+        printf("%s è stato eliminato, bye bye  !\n", buff_receive);
+        if (strcmp(buff_receive, my_id) == 0) {
+            printf("sei  tu.. :/ \n");
+        
+        }
+        int i;
+        for (i = 0; i < num_giocatore; i++) {
+            if (strcmp(giocatori[i], buff_receive) == 0) {
+                break;
+            }
+        }
+		memmove(lista_griglie + i, lista_griglie + i + 1, (num_giocatori - i - 1) * sizeof(struct griglia));
+		memmove(giocatori + i, giocatori + i + 1, (num_giocatori - i - 1) * sizeof(char*));
+		num_giocatori -= 1;
         goto ricezione_notizie;
 
     case 3:
@@ -541,7 +554,7 @@ ricezione_notizie:
         converti_input(buff_receive, &riga, &colonna);
         risultato = applica_attacco(&my_griglia, riga, colonna)
             if (risultato == 2) {
-                if (my_griglia.count == 19) {
+                if (my_griglia.count == 19) { //19 nr totale navi
                     printf("hai perso")!
                         manda_server(ds_sock, "perso");
                 }
@@ -566,17 +579,21 @@ ricezione_notizie:
 
 gestione_turno:
     char* giocatore;
-    printf("E'il tuo turno! Scegli cosa vuoi fare.\n");
+    printf("E'il tuo turno!\n");
 scelta_azione:
+    printf("Scegli cosa vuoi fare.\n");
     printf("1-prepara mossa\n2-stampa griglie\n"); //da mettere anche l'opzione quit
     unsigned long int numero = richiedi_numero(); //da mettere controlli
     if (numero == 1) {
         printf("scegli il giocatore da attaccare:");
         leggi_stringa(buff_send);
-        for (int i = 0; i < num_giocatore; i++) {
-            if (strcmp(giocatori[i], buff_send) == 0) {
+        int j;
+        for (j = 0; j < num_giocatore; j++) {
+            if (strcmp(giocatori[j], buff_send) == 0) {
                 goto scelta_attacco;
-            }
+            
+             }
+            
         }
         printf("non esiste un giocatore con quel nome\n");
         goto scelta_azione:
@@ -590,23 +607,54 @@ scelta_azione:
             }
             strcpy(mossa, buff_send);
             converti_input(mossa, &riga, &colonna);
-            for (int i = 0; i < num_giocatore; i++) {
+            int i;
+            for (i = 0; i < num_giocatore; i++) {
                 if (strcmp(lista_griglie[i].idgiocatore, buff_send) == 0) {
 
-                    if (lista_griglia[i].disp[riga][colonna].hit == 1) {
+                    if (lista_griglie[i].disp[riga][colonna].hit == 1) {
                         printf("la casella è gia stata attaccata\n");
                         goto scelta_attacco;
                     }
                     break;
                 }
             }
+            
             //la mossa è valida per l'attacco
-            manda_server(ds_sock, buff_send);
-
+            manda_server(ds_sock, buff_send);   
+            //1 allora è colpito
+            //2 allora non é calpito
+            //3 giocatore eliminato
+            //altro non è colpito
+            ricevi_server(ds_sock, buff_receive);
+            if (strcmp(buffreceive, "1") == 0) {
+                lista_griglie[i].disp[riga][colonna].hit = 1;
+                lista_griglie[i].disp[riga][colonna].status = 1;
+                printf("Hai colpito una nave!.\n");
+                goto scelta_azione;
+            }
+            else if (strcmp(buff_receive, "2")) {
+                lista_griglie[i].disp[riga][colonna].hit = 1;
+                lista_griglie[i].disp[riga][colonna].status = 0;
+                puts("Il colpo è andato a vuoto");
+                goto ricezione_notizie;
+                
+            }
+            else if (strcmp(buff_receive, "3")) { //lista_griglie giocatori e num_giocatori vengono aggiornati
+                
+				memmove(lista_griglie+i, lista_griglie+i+1, (num_giocatori-i-1)*sizeof(struct griglia));
+				memmove(giocatori + i, giocatori + i + 1, (num_giocatori - i - 1) * sizeof(char *));
+                num_giocatori -= 1;
+                printf("hai affondato l'ultima nave di %s!!! Il giocatore è stato quindi eliminato", giocatore);
+                goto scelta_azione;
+            }
+            else {
+                goto ricezione_notizie;
+            }
+            
 
 
     }
-
+ 
 }
        
       
@@ -625,61 +673,16 @@ scelta_azione:
     2- manda uno per uno il nome dei giocatori
     il cliente sceglie la disposizione $
     il client comunica al server che ha completato la disposizione ----> manda "completata"  $
-    il server comunica ufficialmente l'inizio della partita "iniziopartita" 
+    il server comunica ufficialmente l'inizio della partita "iniziopartita" $
     COMINCIA PARTITA
-    1-attesa (analizzare le NOTIZIE)
-    2-turno (scegli mossa o altro)
+    1-attesa (analizzare le NOTIZIE) $
+    2-turno (scegli mossa o altro) $
     ricevi informazioni dal server
     
     */
     
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    unsigned long codice;
-
-    while (1)
-    {
-        //richiesta azione
-        richiesta_azione:
-        printf("azioni possibili:\n1-azione1\n2-azione2\n3-azione3\n4-azione4\n");
-        codice = richiedi_numero();
-        switch (codice) {
-        case 1:
-            printf("azione 1\n"); //sostituire con l'azione voluta
-            goto richiesta_azione;
-        case 2:
-            printf("azione 2\n");
-            goto richiesta_azione;
-        case 3:
-            printf("azione 3\n");
-            goto richiesta_azione;
-        case 4:
-            printf("azione 4\n");
-            goto richiesta_azione;
-        default:
-            printf("immettere un codice azione valido\n");
-            goto richiesta_azione;
-        }
-
-
-    }
+   
 
     /* parte da copiare per la struttura della ricezione dei messaggi
     do {
