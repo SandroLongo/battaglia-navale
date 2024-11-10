@@ -238,7 +238,7 @@ void chiudi_thread_client(SOCKET client_s, /*mutex array*/ mutex_array)
 	close(client_s);
 	if (mutex_array != NULL)
 	{
-
+		//da fare
 	}
 	exit_thread();
 } 
@@ -318,7 +318,7 @@ gestione_partita:
 	ReleaseMutex(richiesta_scrivi);
 	manda_client(client_s, "entralobby");
 	HANDLE notizia_pronta = OpenMutex(SYNCHRONIZE, FALSE, my_id);
-	if (WaitForSingleObject(notizia_pronta, INFINITE) == WAIT_FAILED) {
+	if (WaitForSingleObject(notizia_pronta, INFINITE) == WAIT_FAILED) { //aspetta che la partita sia iniziata, attendo che il thread_partita abbia preso i giocatori necessari/è passatp il tempo limite di attesa
 		exitThread();
 	}
 	//partita iniziata
@@ -413,7 +413,7 @@ gestione_turno: //thread partita aspetta che inseriamo la mossa
 	strcpy(notizie->casella, buff_receive);
 	notizie->codice = 5;
 	ReleaseMutex(notizia_attacco);
-	WaitForSingleObject(notizia_pronta, INFINITE);
+	WaitForSingleObject(notizia_pronta, INFINITE); //partita scrive il codice che ci interessa
 	a = notizie->codice;
 	switch (a) {
 
@@ -452,10 +452,253 @@ gestione_turno: //thread partita aspetta che inseriamo la mossa
 
 }
 
-void partita() //funzione del thread_client
+#define MAX_GIOCATORI 7
+
+
+
+
+void partita() //funzione del thread_partita
 {
+	
+	struct array* nomi_partita, * mutex_pronta, * mutex_letta,* nomi_in_vita;
+	HANDLE mutex_attacco;
+	HANDLE handle; //salva momenatenamente il mutex
+	char nome[20];
+	
+	
+	avvio_partita:
+
+	/* INIZIALIZZAZIONE VARIABILI */
+	
+	mutex_attacco = CreateMutex(NULL, FALSE, "mutex_attacco");
+	if (mutex_attacco) {
+		printf("errore nella creazione del mutex\n");
+		exit(EXIT_FAILURE);
+	}
+
+	nomi_partita = init_vector(2, sizeof(char *));
+	if (nomi_partita == NULL) {
+		printf("errore nella creazione del vettore dinamico\n");
+		exit(EXIT_FAILURE);
+	}
+
+	mutex_pronta = init_vector(2, sizeof(HANDLE)); //notizia pronta
+	if (mutex_pronta == NULL) {
+		printf("errore nella creazione del vettore dinamico\n");
+		exit(EXIT_FAILURE);
+	}
+
+	mutex_letta = init_vector(2, sizeof(HANDLE));
+	if (nomi_partita == NULL) {
+		printf("errore nella creazione del vettore dinamico\n");
+		exit(EXIT_FAILURE);
+	}
+
+	nomi_in_vita = init_vector(2, sizeof(HANDLE));
+	if (nomi_in_vita == NULL) {
+		printf("errore nella creazione del vettore dinamico\n");
+		exit(EXIT_FAILURE);
+	}
+
+	//ingresso giocatori in paritita
+	/*da creare per client
+	salvare il nome,
+	creare un mutex con il suo nome (notizia_pronta)
+	creare un mutex con il suo nome+'1' (notizia_letta)
+	mettere nel buffer "notiziaAttacco"
+	*/
+	
+	do {
+		//ReleaseMutex(partita_iniziata);
+		WaitForSingleObject(comunicazione_pronta, INFINITE); // da mettere controlli
+		push_back(nomi_partita, &(richieste->buff));
+		push_back(nomi_in_vita, &(richieste->buff));
+		handle = CreateMutex(NULL, FALSE, &(richieste->buff));
+		WaitForSingleObject(handle, INFINITE);
+		push_back(mutex_pronta, &handle);
+		strcpy(&(richieste->buff), nome);
+		strcat(nome, "1");
+		handle = CreateMutex(NULL, FALSE, nome);
+		WaitForSingleObject(handle, INFINITE);      //notizia +1
+		push_back(mutex_letta,&handle);
+		ReleaseMutex(comunicazione_letta);
+		//WaitForSingleObject(partita_iniziata, INFINITE);
+	} while (nomi->count < MAX_GIOCATORI);
+
+   	iniziata = true;
+	
+	for (int j = 0; j < nomi->count;j++) {
+		read_from(mutex_pronta, j, &handle);
+		handle =ReleaseMutex(handle);
+		
+	}
+	//aspettiamo la disposizione delle navi
+	for (int j = 0; j < nomi->count;j++) {
+		read_from(mutex_letta, j, &handle);
+		handle = WaitForSingleObject(mutex_letta,INFINITE);
+	}
+
+	for (int j = 0; j < nomi->count;j++) {
+		read_from(mutex_pronta, j, &handle);
+		handle = ReleaseMutex(handle);
+
+	}
+	int turno = 0;//gestione del turno buffer circolare 
+	int attuale, i; 
+	//gestiamo il turno	
+	gestione_turno_partita:
+	//scriviamo in notizie
+	notizie->codice = 3;
+	read_from(nomi_in_vita, turno, nome);
+	strcpy(nome, notizie->idgiocatore);
+	
+	
+	for (int j = 0; j < nomi->count;j++) {//vedere condizioni for
+		read_from(mutex_pronta, j, &handle);
+		handle = ReleaseMutex(handle);
+	}
+	for (int j = 0; j < nomi->count;j++) {
+		read_from(mutex_letta, j, &handle);
+		handle = WaitForSingleObject(mutex_letta, INFINITE);
+	}
+	
+	
+	//salviamo l'id attuale
+	for (i = 0; i < nomi->count; i++) {
+		read_from(nomi_partita, i, nome);
+		if (strcmp(notizie->idgiocatore, nome) == 0) break;
+	}
+	attuale = i;
+    gestione_turno_singolo: //gestione turno del singolo giocatore
+	
+	WaitForSingleObject(mutex_attacco, INFINITE);
+	for (i = 0; i < nomi->count; i++) {
+		read_from(nomi_partita, i, nome);
+		if (strcmp(notizie->idgiocatore, nome) == 0) break;
+		
+	}
+	read_from(mutex_pronta, i, &handle);
+	ReleaseMutex(&handle, INFINITE);
+	read_from(mutex_letta, i, &handle);
+	WaitForSingleObject(handle, INFINITE);//aspetto mutex letta
+	
+	//leggiamo 1 2 oppure 3
+	if (notizie->codice == 3) { // il client manda 3 se era quella la sua ultima nave
+		//parte dove sistemiamo i giocatori in vita
+		for (i = 0; i < nomi->count; i++) {
+			read_from(nomi_in_vita ,  i, nome);
+			if (strcmp(notizie->idgiocatore, nome) == 0) break;
+
+		}
+		extract_from(nomi_in_vita, i, nome);
+		//con l'if verifichiamo se l'utente è l'unico rimasto
+		if (nomi_in_vita->count == 1) {
+			//dobbiamo resettare il thread partita per l'inzio di una nuova partita free_vector(struct array* arr) CloseHandle
+			read_from(mutex_pronta, attuale, handle);
+			ReleaseMutex(&handle);
+			WaitForSingleObject(mutex_attacco, INFINITE);
+			notizie->codice = 4;
+			//strcpy(id_giocatore)
+			for (int j = 0; j < nomi->count;j++) {
+				read_from(mutex_pronta, j, &handle);
+				handle = ReleaseMutex(handle);
+			}
+			for (int j = 0; j < nomi->count;j++) {
+				read_from(mutex_letta, j, &handle);
+				handle = WaitForSingleObject(mutex_letta, INFINITE);
+			}
+			//chiudiamo tutto
+			for (int j = 0; j < nomi->count;j++) {
+				read_from(mutex_letta, j, &handle);
+				CloseHandle(handle);
+				read_from(mutex_pronta, j, &handle);
+				CloseHandle(handle);
+			}
+			free_vector(nomi_in_vita);
+			free_vector(nomi_partita);
+			free_vector(mutex_pronta);
+			free_vector(mutex_letta);
+
+			goto avvio_partita;
+		}
+		
+		//parte costante
+		read_from(mutex_pronta, attuale, handle);
+		ReleaseMutex(&handle);
+		WaitForSingleObject(mutex_attacco, INFINITE);
+		notizie->codice = 2;
+		//strcpy(id_giocatore)
+		for (int j = 0; j < nomi->count;j++) {
+			read_from(mutex_pronta, j, &handle);
+			handle = ReleaseMutex(handle);
+		}
+		for (int j = 0; j < nomi->count;j++) {
+			read_from(mutex_letta, j, &handle);
+			handle = WaitForSingleObject(mutex_letta, INFINITE);
+		}
+	
+		
+		goto gestione_turno_singolo;
+		
+	
+	}
+	else if (notizie->codice == 2) { //il client non ha colpito niente
+		
+		
+		
+		read_from(mutex_pronta, attuale, handle);
+		ReleaseMutex(&handle);
+		WaitForSingleObject(mutex_attacco, INFINITE);
+		notizie->codice = 1;
+		//strcpy(id_giocatore)
+		for (int j = 0; j < nomi->count;j++) {
+			read_from(mutex_pronta, j, &handle);
+			handle = ReleaseMutex(handle);
+		}
+		for (int j = 0; j < nomi->count;j++) {
+			read_from(mutex_letta, j, &handle);
+			handle = WaitForSingleObject(mutex_letta, INFINITE);
+		}
+
+		turno = (turno + 1) % nomi_in_vita->count;
+		goto gestione_turno_singolo;
+	}
+	else if (notizia->codice == 1) {
+
+	
+		read_from(mutex_pronta, attuale, handle);
+		ReleaseMutex(&handle);
+		WaitForSingleObject(mutex_attacco, INFINITE);
+		notizie->codice = 1;
+		//strcpy(id_giocatore)
+		for (int j = 0; j < nomi->count;j++) {
+			read_from(mutex_pronta, j, &handle);
+			handle = ReleaseMutex(handle);
+		}
+		for (int j = 0; j < nomi->count;j++) {
+			read_from(mutex_letta, j, &handle);
+			handle = WaitForSingleObject(mutex_letta, INFINITE);
+		}
+
+		turno = (turno + 1) % nomi_in_vita->count;
+		goto gestione_turno_partita;
+	
+	
+	
+	}
+
+
+
+
+
+
+
+
+
+
 
 }
+
 
 
 /*thread-controllo_gestione (main):
@@ -552,7 +795,7 @@ int main() { //thread-controllo_gestione
 	}
 
 	richieste = (Sharedrichieste*)MapViewOfFile(
-		hMapFile,            // Handle dell'oggetto di memoria condivisa
+		hrichieste,            // Handle dell'oggetto di memoria condivisa
 		FILE_MAP_ALL_ACCESS, // Accesso in lettura/scrittura
 		0,                   // Offset alto
 		0,                   // Offset basso
@@ -691,8 +934,9 @@ struct array {
 	while (1) {
 		WaitForSingleObject(richiesta_pronta,INFINITE);
 		int a;
+		a = richieste->codice;
 		switch (a) {
-		case 1:
+		case 1: //inserisci nuovo nome
 			
 			for (int i = 0;i < nomi->count;i++) {
 				read_from(nomi, i, buff);
@@ -710,11 +954,12 @@ struct array {
 			richieste->codice = 0;
 			ReleaseMutex(mutex_controllo);
 			continue;
-		case 2:
+		case 2: //entra in partita, se disponibile
 			WaitForSingleObject(partita_iniziata, INFINITE);
 			if (!iniziata) {
+				
 				ReleaseMutex(comunicazione_pronta);
-				ReleaseMutex(comunicazione_letta);
+				WaitForSingleObject(comunicazione_letta, INFINITE);//aspetto thread partita
 				richieste->codice = 0;
 				ReleaseMutex(mutex_controllo);
 			}
@@ -723,7 +968,7 @@ struct array {
 				ReleaseMutex(mutex_controllo);
 			}
 			continue;
-		case 3:
+		case 3: //togliere il nome
 			for (int i = 0;i < nomi->count;i++) {
 				read_from(nomi, i, buff);
 				if (strcmp(buff, richieste->buff) == 0) {

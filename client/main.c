@@ -324,7 +324,7 @@ richiedi_nome:
 
     if (!ricevi_server(ds_sock, buff_receive)) {
         if (strcmp(buff, "ok")) {
-            goto richiedi_nome;
+            goto richiedi_di_giocare;
         }
     }
     else {
@@ -533,7 +533,7 @@ ricezione_notizie:
             goto gestione_turno;
         }
         strcpy(idgiocatore_corrente, buff_receive);
-        printf("é il tuorno di %s\n", idgiocatore_corrente);
+        printf("é il turno di %s\n", idgiocatore_corrente);
         goto ricezione_notizie;
 
     case 4: // la partita è finita
@@ -544,7 +544,8 @@ ricezione_notizie:
         else {
             printf("Hai vinto!\n");
         }
-
+		free(liste_griglie);
+		free(giocatori);
         goto richiedi_di_giocare;
 
 
@@ -552,7 +553,7 @@ ricezione_notizie:
         int risultato;
         ricevi_server(ds_sock, buff_receive);
         converti_input(buff_receive, &riga, &colonna);
-        risultato = applica_attacco(&my_griglia, riga, colonna)
+        risultato = applica_attacco(&my_griglia, riga, colonna);
             if (risultato == 2) {
                 if (my_griglia.count == 19) { //19 nr totale navi
                     printf("hai perso")!
@@ -598,6 +599,7 @@ scelta_azione:
         printf("non esiste un giocatore con quel nome\n");
         goto scelta_azione:
     scelta_attacco:
+        manda_server(ds_sock, buff_send);
         printf("scegli una casella valida per l'attacco")
             strcpy(giocatore, buff_send);
         leggi_stringa(buff_send);
@@ -645,7 +647,15 @@ scelta_azione:
 				memmove(giocatori + i, giocatori + i + 1, (num_giocatori - i - 1) * sizeof(char *));
                 num_giocatori -= 1;
                 printf("hai affondato l'ultima nave di %s!!! Il giocatore è stato quindi eliminato", giocatore);
+                
                 goto scelta_azione;
+            }
+            else if (strcmp(buff_receive, "4")) {
+                printf("hai vinto!!!\n");
+                free(liste_griglie);
+                free(giocatori);
+
+                goto chiedi_di_giocare:
             }
             else {
                 goto ricezione_notizie;
