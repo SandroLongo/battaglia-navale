@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <synchapi.h>
 #pragma comment(lib, "ws2_32.lib")
 
 #define PORTNUMBER 25123
@@ -350,7 +351,7 @@ richiedi_di_giocare:
             controllo = manda_server(ds_sock, buff_send);
             if (controllo == -1) {
                 tentativi++;
-                sleep(1);
+                Sleep(1);
                 printf("tentativo  nr %d di mandare il msg", tentativi);
             }
             else if (controllo == 0) {
@@ -382,7 +383,7 @@ richiedi_di_giocare:
 
     int controllo;
 cerco_di_entrare:   //da mettere controlli
-    sleep(1);
+    Sleep(1);
     controllo = ricevi_server(ds_sock, buff_receive);
 
     /*
