@@ -9,13 +9,471 @@
 #define PORTNUMBER 25123
 #define BACKLOG 10
 #define BUF_DIM 512
+#define NUM_MUTEX 10
 
-int main() {
+
+//dynamic vector
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <stdbool.h>
+#include <assert.h>
+
+struct array;
+
+extern void* init_vector(size_t nmemb, size_t size);//inizializza il vettore
+extern bool insert_at(struct array* arr, size_t pos, void* el);//inserisce elemento in uno slot a piacere
+extern bool push_back(struct array* arr, void* el);//aggiunge elemento alla fine
+extern bool read_from(struct array* arr, size_t pos, void* buffer);//leggere valore
+extern bool extract_from(struct array* arr, size_t pos, void* buffer);//elimina un elemento
+extern void free_vector(struct array* arr);//free di tutto
+
+struct array {
+	size_t count; // currently used slots
+	size_t slots; // total slots 
+	size_t size; // size of a slot
+	void* arr; // the actual array
+};
+
+static inline bool resize(struct array* arr, size_t new_size)
+{
+	assert(arr->count < new_size);
+	arr->arr = realloc(arr->arr, new_size * arr->size);
+	if (!arr->arr)
+		return false;
+	arr->slots = new_size;
+	return true;
+}
+
+void* init_vector(size_t nmemb, size_t size)
+{
+	struct array* ret;
+	void* p;
+
+	// Check for overflow
+	if (size && nmemb > (size_t)-1 / size) {
+		errno = ENOMEM;
+		return 0;
+	}
+
+	p = malloc(size * nmemb);
+	if (!p)
+		return p;
+	memset(p, 0, size);
+
+	ret = malloc(sizeof(struct array));
+	if (!ret) {
+		free(p);
+		return ret;
+	}
+
+	ret->count = 0;
+	ret->slots = nmemb;
+	ret->size = size;
+	ret->arr = p;
+
+	return ret;
+}
+
+void free_vector(struct array* arr)
+{
+	free(arr->arr);
+	free(arr);
+}
+
+bool push_back(struct array* arr, void* el)
+{
+	return insert_at(arr, arr->count, el);
+}
+
+bool insert_at(struct array* arr, size_t pos, void* el)
+{
+	char* from, * to;
+	size_t size;
+
+	if (pos > arr->count)
+		return false;
+
+	if (arr->count + 1 > arr->slots)
+		if (!resize(arr, arr->slots * 2))
+			return false;
+
+	from = (char*)arr->arr + pos * arr->size;
+	if (pos + 1 < arr->slots) {
+		to = from + arr->size;
+		size = (arr->count - pos) * arr->size;
+		memmove(to, from, size);
+	}
+
+	memcpy(from, el, arr->size);
+
+	arr->count++;
+	assert(arr->count <= arr->slots);
+	return true;
+}
+
+bool read_from(struct array* arr, size_t pos, void* buffer)
+{
+	if (pos < arr->count) {
+		memcpy(buffer, (char*)arr->arr + pos * arr->size, arr->size);
+		return true;
+	}
+
+	return false;
+}
+
+bool extract_from(struct array* arr, size_t pos, void* buffer) 
+{
+	char* from, * to;
+	size_t size;
+
+	if (!read_from(arr, pos, buffer))
+		return false;
+
+	if (pos + 1 < arr->slots) {
+		from = (char*)arr->arr + (pos + 1) * arr->size;
+		to = from - arr->size;
+		size = (arr->count - pos) * arr->size;
+		memmove(to, from, size);
+	}
+
+	arr->count--;
+	if (arr->count < arr->slots / 2)
+		resize(arr, arr->slots / 2);
+	return true;
+}
+
+
+typedef struct {
+	int codice;
+	char casella[5];
+	int hit;
+	char idgiocatore[20];
+	int num_giocatori;
+	char** giocatori;
+
+} Sharednotizie;
+
+typedef struct {
+	int codice;
+	char buff[BUF_DIM];
+
+} Sharedrichieste;
+
+//VARIABILI GLOBALI
+struct array* nomi; //ARRAY DI NOMI(mutex)
+bool iniziata;//bool partita iniziata(o no) 
+// (mutex)
+HANDLE mutex[NUM_MUTEX];
+Sharednotizie* notizie;//area di mem per scambio messaggi(notizie) (mutex)
+Sharedrichieste* richieste; //area di mem per scambio messaggi(richieste dei thread) (mutex)
+HANDLE hnotizie;
+HANDLE hrichieste;
+HANDLE comunicazione_pronta, comunicazione_letta, partita_iniziata;
+HANDLE richiesta_pronta, richiesta_scrivi, mutex_controllo;
+SOCKET server_s; //il descrittore socket socket
+//funzioni dei thread
+
+typedef	struct {
+	SOCKET server_s;
+} Parametri_client;
+
+void accettazione() //funzione del thread_accettazione
+{
+	SOCKET client_s;
+	struct sockaddr_in client_addr;
+	int length;
+	HANDLE thread_client;
+	int ret;
+
+	Parametri_client* param = (Parametri_client*)malloc(sizeof(Parametri_client));
+	while (1) {
+		length = sizeof(client_addr);
+		client_s = accept(server_s, (struct sockaddr*)&client_addr, &length);
+		if (client_s == INVALID_SOCKET) {
+			printf("errore nella accept\n");
+			continue;
+		}
+		param->server_s = client_s;
+		thread_client = CreateThread(
+			NULL,      // Attributi predefiniti
+			0,         // Dimensione dello stack predefinita
+			funzione_client, // Funzione del thread
+			(LPVOID)param,      // Parametri per la funzione
+			0,         // Esegui il thread immediatamente
+			NULL       // ID del thread
+		);
+		
+		printf("connessione effettuata con un client\n");
+	}
+
+
+
+}
+
+//funzione del thread_client
+
+int manda_client(int sock, char* buff) {
+
+	int bytes_sent = send(sock, buff, strlen(buff), 0);
+	if (bytes_sent == -1) {
+		printf("errore durante l'invio dei dati al server\n");
+		return -1;
+	}
+	return 0;
+}
+int ricevi_client(int sock, char* buf) {
+	int bytes_received = recv(sock, buf, BUF_DIM, 0);
+	if (bytes_received > 0) {
+		buf[bytes_received] = '\0';  
+		return 0;
+	}
+	else if (bytes_received == 0) return 1;
+
+}
+
+void chiudi_thread_client(SOCKET client_s, /*mutex array*/ mutex_array)
+{
+	close(client_s);
+	if (mutex_array != NULL)
+	{
+
+	}
+	exit_thread();
+} 
+
+void funzione_client(LPVOID lpparam) 
+{
+	int ret, tentativi, a, i, j;
+	Parametri_client* param = (Parametri_client*)lpparam;
+	SOCKET client_s = param->server_s; // Ottieni il socket del client
+	char buff_receive[BUF_DIM], buff_send[BUF_DIM];
+	DWORD mutexRet;
+	char my_id[20];
+	
+	//ricezione nome e controllo
+richiedi_nome:
+	ret = ricevi_client(client_s, buff_receive);
+	if (ret == 0) {
+		printf("il client ha chiuso la connessione\n");
+		chiudi_thread_client(client_s, NULL);
+		}
+	
+
+	if (WaitForSingleObject(richiesta_scrivi, INFINITE) == WAIT_FAILED) {
+		exitThread();
+	}
+	
+	richieste->codice = 1;
+	strcpy(richieste->buff, buff_receive);
+	ReleaseMutex(richiesta_pronta);
+	if (WaitForSingleObject(mutex_controllo, INFINITE) == WAIT_FAILED) {
+		exitThread();
+	}
+	if (richieste->codice) {
+		manda_client(client_s, "nonok");
+		ReleaseMutex(richiesta_scrivi);
+		goto richiedi_nome;
+	}
+	ReleaseMutex(richiesta_scrivi);
+	manda_client(client_s, "ok");
+	strcpy(my_id, buff_receive);
+entra_partita:
+	ret = ricevi_client(client_s, buff_receive);
+	if (ret == 0) {
+		printf("il client ha chiuso la connessione\n");
+		chiudi_thread_client(client_s, NULL);
+	}
+	if (strcmp(buff_receive, "entra_in_partita") != 0) {
+		goto entra_partita;
+	}
+	tentativi = 0;
+	do {
+		if (WaitForSingleObject(richiesta_scrivi, INFINITE) == WAIT_FAILED) {
+			exitThread();
+		}
+
+		richieste->codice = 2;
+		strcpy(richieste->buff, my_id);
+		ReleaseMutex(richiesta_pronta);
+		if (WaitForSingleObject(mutex_controllo, INFINITE) == WAIT_FAILED) {
+			exitThread();
+		}
+		if (richieste->codice == 0) {
+			manda_client(client_s, "nonok");
+			ReleaseMutex(richiesta_scrivi);
+			goto gestione_partita;
+		}
+		ReleaseMutex(richiesta_scrivi);
+		
+	} while (tentativi < 5);
+	chiudi_thread_client(client_s, NULL);
+gestione_partita:
+//attesa che inizi e apertura mutex
+	HANDLE notizia_attacco = OpenMutex(SYNCHRONIZE, FALSE, richieste->buff);
+	strcpy(buff_receive, my_id);//da creare  in thread_partita
+	strcat(buff_receive, "1");
+	HANDLE notizia_letto = OpenMutex(SYNCHRONIZE, FALSE, buff_receive);//da creare in thread_partita
+	ReleaseMutex(richiesta_scrivi);
+	manda_client(client_s, "entralobby");
+	HANDLE notizia_pronta = OpenMutex(SYNCHRONIZE, FALSE, my_id);
+	if (WaitForSingleObject(notizia_pronta, INFINITE) == WAIT_FAILED) {
+		exitThread();
+	}
+	//partita iniziata
+	manda_client(client_s, "disposizione navi");
+	
+	//mando idgiocatori
+	for (i = 0; i < notizie->num_giocatori;i++) {
+		manda_client(client_s, notizie->giocatori[i]);
+	}
+	
+	 
+	ret = ricevi_client(client_s, buff_receive);
+	if (ret == 0) {
+		printf("il client ha chiuso la connessione\n");
+		chiudi_thread_client(client_s, NULL);
+	}
+	if (strcmp(buff_receive, "completata") != 0) {
+		chiudi_thread_client(client_s, NULL);
+	}
+	ReleaseMutex(notizia_letto);
+	WaitForSingleObject(notizia_pronta, INFINITE);
+	manda_client(client_s, "iniziopartita");
+
+
+gestione_notizie:
+	/*   MESSAGGI CLIENT PARTITA-CLIENT SERVER
+
+   costruzione messaggi da server (in partita, dal punto 5)
+NOTIZIE
+notizia_mossa(globale) = 1+casella+hit(o no)+idgiocatore
+notizia_giocatoreeliminato(globale) = 2+idgiocatore( se id giocatore mio ho perso)
+notizia_turno(globale) = 3+idgiocatore
+notizia_vittoriagiocatore(globale) = 4+idgiocatore (ti passa al punto 2)
+notizia_attacco(privato) = 5+casella
+mossa = casella + idgiocatore
+*/
+	WaitForSingleObject(notizia_pronta, INFINITE);
+	a = notizie->codice;
+	switch (a) {
+	case 1://devo mandare msg   1 + casella + hit(o no) + idgiocatore
+		manda_client(client_s, notizie->codice);
+		manda_client(client_s, notizie->casella);
+		manda_client(client_s, notizie->hit);
+		manda_client(client_s, notizie->idgiocatore);
+		ReleaseMutex(notizia_letto);
+	case 2:
+		manda_client(client_s, notizie->codice);
+		manda_client(client_s, notizie->idgiocatore);
+		ReleaseMutex(notizia_letto);
+	case 3:
+		manda_client(client_s, notizie->codice);
+		manda_client(client_s, notizie->idgiocatore);
+		ReleaseMutex(notizia_letto);
+		if (strcmp(notizie->idgiocatore, my_id) == 0) goto gestione_turno;
+	case 4:
+		manda_client(client_s, notizie->codice);
+		manda_client(client_s, notizie->idgiocatore);
+		goto entra_partita;
+	case 5: //dopo ci arriva hit miss o perso
+		manda_client(client_s, notizie->casella);
+		ret = ricevi_client(client_s, buff_receive);
+		if (ret == 0) {
+			printf("il client ha chiuso la connessione\n");
+			chiudi_thread_client(client_s, NULL);
+		}
+		/*
+		se arriva hit -> codice = 1
+		se arriva miss -> codice = 2
+		se arriva perso -> codice = 3
+		*/
+		if (strcmp("hit", buff_receive)) {
+			notizie->codice = 1;
+		}
+		else if (strcmp("miss", buff_receive)) {
+			notizie->codice = 2;
+		}
+		else if (strcmp("perso", buff_receive)) {
+			notizie->codice = 3;
+		}
+		ReleaseMutex(notizia_letto);
+
+	default:
+		printf("errore comunicazione.\n");
+		return EXIT_FAILURE;
+	}
+	//la disposizione è finita, partita iniziata ufficialmente
+ //da mettere controllo
+gestione_turno: //thread partita aspetta che inseriamo la mossa
+	ricevi_client(client_s, buff_receive);
+	strcpy(notizie->idgiocatore, buff_receive);
+	ricevi_client(client_s, buff_receive);
+	strcpy(notizie->casella, buff_receive);
+	notizie->codice = 5;
+	ReleaseMutex(notizia_attacco);
+	WaitForSingleObject(notizia_pronta, INFINITE);
+	a = notizie->codice;
+	switch (a) {
+
+	case 1:
+		manda_client(client_s, "1");
+		notizie->codice = 1;
+		notizie->hit = 1;
+		ReleaseMutex(notizia_attacco);//abbiamo scritto una notizia
+		ReleaseMutex(notizia_letto);// aspetto che tutti leggano il mio msg
+		goto gestione_turno;
+	case 2:
+		manda_client(client_s, "2");
+		notizie->codice = 1;
+		notizie->hit = 0;
+		ReleaseMutex(notizia_attacco);
+		ReleaseMutex(notizia_letto);
+		goto gestione_notizie;
+	case 3:
+		manda_client(client_s, "3");
+		notizie->codice = 2;
+		ReleaseMutex(notizia_attacco);
+		ReleaseMutex(notizia_letto);
+		goto gestione_turno;
+	case 4:
+		manda_client(client_s, "4");
+		notizie->codice = 4;
+		strcpy(notizie->idgiocatore, my_id);
+		ReleaseMutex(notizia_attacco);
+		ReleaseMutex(notizia_letto);
+		goto entra_partita;
+	}
+
+	
+
+
+
+}
+
+void partita() //funzione del thread_client
+{
+
+}
+
+
+/*thread-controllo_gestione (main):
+   1-prepara tutto
+   2-lancia thread accettazione e thread partita
+   3- gestisce le richieste dei thread(ex: voglio che cancelli il mio nome)*/
+
+
+int main() { //thread-controllo_gestione
     WSADATA wsaData;
-    SOCKET server_s, client_s;
+    SOCKET client_s;
     int length;
     struct sockaddr_in server_addr, client_addr;
-    char buf[BUF_DIM];
+    char buff[BUF_DIM];
+
+	//PREPARAZIONE DEL NECESSARIO
+
+	//preparazione scocket
 
     if (WSAStartup(MAKEWORD(2, 2), &wsaData)) {
         printf("errore nella WSAStartup\n");
@@ -45,7 +503,295 @@ int main() {
 
     printf("Server in ascolto su porta %d\n", PORTNUMBER);
 
-    while (1) {
+	bool iniziata = false;
+
+	hnotizie = CreateFileMapping(
+		INVALID_HANDLE_VALUE, // Usa la memoria di paging del sistema
+		NULL,                 // Sicurezza predefinita
+		PAGE_READWRITE,      // Accesso in lettura/scrittura
+		0,                    // Dimensione massima dell'oggetto (ignora)
+		sizeof(Sharednotizie),   // Dimensione dell'oggetto
+		"MySharedMemory"      // Nome dell'oggetto di memoria condivisa
+	);
+
+	if (hnotizie == NULL) {
+		printf("CreateFileMapping failed (%d).\n", GetLastError());
+		return 1;
+	}
+
+	notizie = (Sharednotizie*)MapViewOfFile(
+		hnotizie,            // Handle dell'oggetto di memoria condivisa
+		FILE_MAP_ALL_ACCESS, // Accesso in lettura/scrittura
+		0,                   // Offset alto
+		0,                   // Offset basso
+		0                    // Dimensione
+	);
+
+	if (notizie == NULL) {
+		printf("MapViewOfFile failed (%d).\n", GetLastError());
+		CloseHandle(hnotizie);
+		return 1;
+	}
+
+	/*
+		*********************** SHARED MEM PER IL CONTROLLO*************************
+		*/
+	
+	    hrichieste = CreateFileMapping(
+		INVALID_HANDLE_VALUE, // Usa la memoria di paging del sistema
+		NULL,                 // Sicurezza predefinita
+		PAGE_READWRITE,      // Accesso in lettura/scrittura
+		0,                    // Dimensione massima dell'oggetto (ignora)
+		sizeof(Sharedrichieste),   // Dimensione dell'oggetto
+		"MySharedMemory"      // Nome dell'oggetto di memoria condivisa
+	);
+
+	if (hrichieste == NULL) {
+		printf("CreateFileMapping failed (%d).\n", GetLastError());
+		return 1;
+	}
+
+	richieste = (Sharedrichieste*)MapViewOfFile(
+		hMapFile,            // Handle dell'oggetto di memoria condivisa
+		FILE_MAP_ALL_ACCESS, // Accesso in lettura/scrittura
+		0,                   // Offset alto
+		0,                   // Offset basso
+		0                    // Dimensione
+	);
+
+	if (richieste == NULL) {
+		printf("MapViewOfFile failed (%d).\n", GetLastError());
+		CloseHandle(hrichieste);
+		return 1;
+	}
+
+	/*
+		*********************** MUTEX PER SINCRONIZZAZIONE *************************
+		mutex = CreateMutex(NULL, FALSE, NULL); HANDLE comunicazione_pronta, comunicazione_letta, partita_iniziata;
+		
+		*/
+	richiesta_pronta = CreateMutex(NULL, FALSE, NULL);
+	if (richiesta_pronta) {
+		printf("errore nella creazione del mutex\n");
+		exit(EXIT_FAILURE);
+	}
+	if (WaitForSingleObject(richiesta_pronta, INFINITE) != WAIT_OBJECT_0) {
+		printf("errore nella gestione del mutex.\n");
+		return EXIT_FAILURE;
+	}
+	
+	richiesta_scrivi = CreateMutex(NULL, FALSE, NULL);
+	if (richiesta_scrivi) {
+		printf("errore nella creazione del mutex\n");
+		exit(EXIT_FAILURE);
+	}
+
+	comunicazione_letta = CreateMutex(NULL, FALSE, NULL);
+	if (comunicazione_letta) {
+		printf("errore nella creazione del mutex\n");
+		exit(EXIT_FAILURE);
+	}	
+	if (WaitForSingleObject(comunicazione_letta, INFINITE) != WAIT_OBJECT_0) {
+		printf("errore nella gestione del mutex.\n");
+		return EXIT_FAILURE;
+	}
+
+	comunicazione_pronta = CreateMutex(NULL, FALSE, NULL);
+	if (comunicazione_pronta) {
+		printf("errore nella creazione del mutex\n");
+		exit(EXIT_FAILURE);
+	}
+	if (WaitForSingleObject(comunicazione_pronta, INFINITE) != WAIT_OBJECT_0) {
+		printf("errore nella gestione del mutex.\n");
+		return EXIT_FAILURE;
+	}
+	partita_iniziata = CreateMutex(NULL, FALSE, NULL);
+	if (partita_iniziata) {
+		printf("errore nella creazione del mutex\n");
+		exit(EXIT_FAILURE);
+	}
+
+	mutex_controllo = CreateMutex(NULL, FALSE, NULL);
+	if (WaitForSingleObject(mutex_controllo, INFINITE) != WAIT_OBJECT_0) {
+		printf("errore nella gestione del mutex.\n");
+		return EXIT_FAILURE;
+	}
+	if (mutex_controllo) {
+		printf("errore nella creazione del mutex\n");
+		exit(EXIT_FAILURE);
+	}
+	/*
+		*********************** array dinamico  per nomi *************************
+	
+
+		*/
+
+	nomi = init_vector(10, sizeof(char*));
+	
+	
+	//creazione del thread-accettazione
+
+	
+	
+	HANDLE thread_accettazione = CreateThread(
+		NULL,      // Attributi predefiniti
+		0,         // Dimensione dello stack predefinita
+		accettazione, // Funzione del thread
+		NULL,      // Parametri per la funzione
+		0,         // Esegui il thread immediatamente
+		NULL       // ID del thread
+	);
+
+	HANDLE thread_partita = CreateThread(
+		NULL,      // Attributi predefiniti
+		0,         // Dimensione dello stack predefinita
+		partita, // Funzione del thread
+		NULL,      // Parametri per la funzione
+		0,         // Esegui il thread immediatamente
+		NULL       // ID del thread
+	);
+
+	//tutto pronto ci mettiamo a rispondere alle richieste di infomazioni
+
+
+	
+
+
+
+	//Creare i thread: Crea i thread che utilizzeranno la memoria condivisa.
+	/*
+	HANDLE hThread = CreateThread(
+		NULL,      // Attributi predefiniti
+		0,         // Dimensione dello stack predefinita
+		ThreadFunction, // Funzione del thread
+		NULL,      // Parametri per la funzione
+		0,         // Esegui il thread immediatamente
+		NULL       // ID del thread
+	);
+	*/
+	// Attendi che il thread termini
+	
+	
+	/*
+		1+idgiocatore = richiesta nome
+		2+idgiocatore = richiesta entrare in partita
+
+*/
+	/* *********** thread controllo in azione 
+	
+	extern bool push_back(struct array* arr, void* el);//aggiunge elemento alla fine
+extern bool read_from(struct array* arr, size_t pos, void* buffer);//leggere valore
+struct array {
+	size_t count; // currently used slots
+	size_t slots; // total slots
+	size_t size; // size of a slot
+	void* arr; // the actual array
+	
+	*/
+	while (1) {
+		WaitForSingleObject(richiesta_pronta,INFINITE);
+		int a;
+		switch (a) {
+		case 1:
+			
+			for (int i = 0;i < nomi->count;i++) {
+				read_from(nomi, i, buff);
+				if(strcmp(buff,richieste->buff)== 0){
+					richieste->codice = 1;
+					ReleaseMutex(mutex_controllo);
+					continue;
+				
+				}
+			
+			
+			}
+
+			push_back(nomi, richieste->buff);
+			richieste->codice = 0;
+			ReleaseMutex(mutex_controllo);
+			continue;
+		case 2:
+			WaitForSingleObject(partita_iniziata, INFINITE);
+			if (!iniziata) {
+				ReleaseMutex(comunicazione_pronta);
+				ReleaseMutex(comunicazione_letta);
+				richieste->codice = 0;
+				ReleaseMutex(mutex_controllo);
+			}
+			else {
+				richieste->codice = 1;
+				ReleaseMutex(mutex_controllo);
+			}
+			continue;
+		case 3:
+			for (int i = 0;i < nomi->count;i++) {
+				read_from(nomi, i, buff);
+				if (strcmp(buff, richieste->buff) == 0) {
+					extract_from(nomi,  i, buff);
+					ReleaseMutex(mutex_controllo);
+					continue;
+				
+				}
+				
+
+			}
+			ReleaseMutex(mutex_controllo);
+			continue;
+		
+		}
+
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	//mutex = CreateMutex(NULL, FALSE, NULL);
+
+
+
+
+
+
+	 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+	
+	while (1) {
         length = sizeof(client_addr);
         client_s = accept(server_s, (struct sockaddr*)&client_addr, &length);
         if (client_s == INVALID_SOCKET) {
@@ -75,4 +821,71 @@ int main() {
     closesocket(server_s);
     WSACleanup();
     return 0;
+
+
+
+
 }
+
+
+
+
+/*
+   attori e ruoli
+   thread client: 
+   1-gestisce i messaggi client-server (sia in ricezione che in invio)
+   2-creare le notizie che scrivera su un area di memoria dove tutti le prenderanno
+   3-fa entrare il client in partita (comunicando al thread-partita il suo id)
+   4- 
+
+   thread-controllo_gestione (main):
+   1-prepara tutto
+   2-lancia thread accettazione e thread partita
+   3- gestisce le richieste dei thread(ex: voglio che cancelli il mio nome) 
+
+   thread-accettazione:
+   1-accettare nuove connessioni
+   2-creare thread-client
+
+   thread-partita:
+   1-gestiste i turni
+   2-avvia la partita
+   3-dice ai thread-client che cè una notizia(diffonde notizie ai thread client)
+
+   RISORSE (VARIABILI GLOBALI)
+
+   ARRAY DI NOMI (mutex)
+   bool partita iniziata (o no) (mutex)
+   area di mem per scambio messaggi (notizie) (mutex)
+   il descrittore socket socket
+
+
+
+
+
+
+   MESSAGGI CLIENT PARTITA-CLIENT SERVER
+   
+   costruzione messaggi da server (in partita, dal punto 5)
+NOTIZIE
+notizia_mossa(globale) = 1+casella+hit(o no)+idgiocatore
+notizia_giocatoreeliminato(globale) = 2+idgiocatore( se id giocatore mio ho perso)
+notizia_turno(globale) = 3+idgiocatore
+notizia_vittoriagiocatore(globale) = 4+idgiocatore (ti passa al punto 2)
+notizia_attacco(privato) = 5+casella+idgiocatore
+mossa = casella + idgiocatore
+
+MESSAGGI AL THREAD CONTROLLO
+
+1+idgiocatore = richiesta nome
+2+idgiocatore = richiesta entrare in partita
+
+   
+   
+   
+   
+   
+
+
+
+*/
