@@ -146,7 +146,7 @@ int inserisci_nave(struct griglia* griglia, unsigned dim, int riga, int colonna,
 
 int  leggi_stringa(char* str)
 {
-    if (fgets(str, BUF_DIM , stdin) == NULL) {
+    if (fgets(str, BUF_DIM , stdin) != NULL) {
         size_t len = strlen(str);
         if (len > 0 & str[len - 1] == '\n') {
             str[len - 1] = '\0'; // Rimuove il carattere di newline
@@ -258,7 +258,7 @@ int ricevi_server(int sock,char* buf) {
         buf[bytes_received] = '\0';  // Assicurati di terminare la stringa
         return 0;
     }
-    else if (bytes_received == 0) return 1;
+    else if (bytes_received <= 0) return 1;
 
 }
 
@@ -313,9 +313,9 @@ richiedi_nome:
     }
 
 
-    if (!ricevi_server(ds_sock, buff_receive)) {
+    if (ricevi_server(ds_sock, buff_receive) == 0) {
         if (strcmp(buff_receive, "ok")) {
-            goto richiedi_di_giocare;
+            goto richiedi_nome;
         }
     }
     else {

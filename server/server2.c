@@ -226,7 +226,7 @@ void funzione_client(LPVOID lpparam)
 	//ricezione nome e controllo
 richiedi_nome:
 	ret = ricevi_client(client_s, buff_receive);
-	if (ret == 0) {
+	if (ret != 0) {
 		printf("il client ha chiuso la connessione\n");
 		chiudi_thread_client(client_s, NULL);
 		}
@@ -252,7 +252,7 @@ richiedi_nome:
 	strcpy(my_id, buff_receive);
 entra_partita:
 	ret = ricevi_client(client_s, buff_receive);
-	if (ret == 0) {
+	if (ret != 0) {
 		printf("il client ha chiuso la connessione\n");
 		chiudi_thread_client(client_s, NULL);
 	}
@@ -309,7 +309,7 @@ gestione_partita:
 	}
 	 
 	ret = ricevi_client(client_s, buff_receive);
-	if (ret == 0) {
+	if (ret != 0) {
 		printf("il client ha chiuso la connessione\n");
 		chiudi_thread_client(client_s, NULL);
 	}
