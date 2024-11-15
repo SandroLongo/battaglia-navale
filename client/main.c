@@ -402,7 +402,9 @@ cerco_di_entrare:   //da mettere controlli
     }
     //arrivano i nomi dei giocatori
     int num_giocatori = 0;
-    ricevi_server(ds_sock, num_giocatori);
+    ricevi_server(ds_sock, buff_receive);
+    //riceviamo num giocatori
+    num_giocatori = atoi(buff_receive);
     char** giocatori = malloc(sizeof(char*) * num_giocatori);
     int k;
     for (k = 0;k < num_giocatori;k++) {
@@ -480,7 +482,7 @@ cerco_di_entrare:   //da mettere controlli
     //int turno; //indice gicoatore che ha turno  da fare (sapere chi ha attaccato chi)
 ricezione_notizie:
     ricevi_server(ds_sock, buff_receive);
-    a = atoi(buff_receive[0]);
+    a = atoi(buff_receive);
     switch (a) {
     case 1:
         ricevi_server(ds_sock, buff_receive); //ci arrvva la casella

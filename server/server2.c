@@ -1,4 +1,5 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <WinSock2.h>
 #include <ws2tcpip.h>
@@ -144,6 +145,9 @@ bool extract_from(struct array* arr, size_t pos, void* buffer)
 	return true;
 }
 
+typedef	struct {
+	SOCKET server_s;
+} Parametri_client;
 
 typedef struct {
 	int codice;
@@ -175,55 +179,19 @@ HANDLE richiesta_pronta, richiesta_scrivi, mutex_controllo;
 SOCKET server_s; //il descrittore socket socket
 //funzioni dei thread
 
-typedef	struct {
-	SOCKET server_s;
-} Parametri_client;
-
-void accettazione() //funzione del thread_accettazione
-{
-	SOCKET client_s;
-	struct sockaddr_in client_addr;
-	int length;
-	HANDLE thread_client;
-	int ret;
-
-	Parametri_client* param = (Parametri_client*)malloc(sizeof(Parametri_client));
-	while (1) {
-		length = sizeof(client_addr);
-		client_s = accept(server_s, (struct sockaddr*)&client_addr, &length);
-		if (client_s == INVALID_SOCKET) {
-			printf("errore nella accept\n");
-			continue;
-		}
-		param->server_s = client_s;
-		thread_client = CreateThread(
-			NULL,      // Attributi predefiniti
-			0,         // Dimensione dello stack predefinita
-			funzione_client, // Funzione del thread
-			(LPVOID)param,      // Parametri per la funzione
-			0,         // Esegui il thread immediatamente
-			NULL       // ID del thread
-		);
-		
-		printf("connessione effettuata con un client\n");
-	}
-
-
-
-}
 
 //funzione del thread_client
 
-int manda_client(int sock, char* buff) {
+int manda_client(SOCKET sock, char* buff) {
 
-	int bytes_sent = send(sock, buff, strlen(buff), 0);
+	size_t bytes_sent =   send(sock, buff, strlen(buff), 0);
 	if (bytes_sent == -1) {
 		printf("errore durante l'invio dei dati al server\n");
 		return -1;
 	}
 	return 0;
 }
-int ricevi_client(int sock, char* buf) {
+int ricevi_client(SOCKET sock, char* buf) {
 	int bytes_received = recv(sock, buf, BUF_DIM, 0);
 	if (bytes_received > 0) {
 		buf[bytes_received] = '\0';  
@@ -233,14 +201,16 @@ int ricevi_client(int sock, char* buf) {
 
 }
 
-void chiudi_thread_client(SOCKET client_s, /*mutex array*/ mutex_array)
+void chiudi_thread_client(SOCKET client_s,HANDLE * a)
+ 
 {
-	close(client_s);
-	if (mutex_array != NULL)
+	closesocket(client_s);
+	if (a != NULL)
 	{
 		//da fare
 	}
-	exit_thread();
+	
+	ExitThread(0);
 } 
 
 void funzione_client(LPVOID lpparam) 
@@ -249,7 +219,8 @@ void funzione_client(LPVOID lpparam)
 	Parametri_client* param = (Parametri_client*)lpparam;
 	SOCKET client_s = param->server_s; // Ottieni il socket del client
 	char buff_receive[BUF_DIM], buff_send[BUF_DIM];
-	DWORD mutexRet;
+	char numero[10];
+	//DWORD mutexRet;
 	char my_id[20];
 	
 	//ricezione nome e controllo
@@ -262,14 +233,14 @@ richiedi_nome:
 	
 
 	if (WaitForSingleObject(richiesta_scrivi, INFINITE) == WAIT_FAILED) {
-		exitThread();
+		ExitThread(0);
 	}
 	
 	richieste->codice = 1;
 	strcpy(richieste->buff, buff_receive);
 	ReleaseMutex(richiesta_pronta);
 	if (WaitForSingleObject(mutex_controllo, INFINITE) == WAIT_FAILED) {
-		exitThread();
+		ExitThread(0);
 	}
 	if (richieste->codice) {
 		manda_client(client_s, "nonok");
@@ -291,14 +262,14 @@ entra_partita:
 	tentativi = 0;
 	do {
 		if (WaitForSingleObject(richiesta_scrivi, INFINITE) == WAIT_FAILED) {
-			exitThread();
+			ExitThread(0);
 		}
 
 		richieste->codice = 2;
 		strcpy(richieste->buff, my_id);
 		ReleaseMutex(richiesta_pronta);
 		if (WaitForSingleObject(mutex_controllo, INFINITE) == WAIT_FAILED) {
-			exitThread();
+			ExitThread(0);
 		}
 		if (richieste->codice == 0) {
 			manda_client(client_s, "nonok");
@@ -311,24 +282,31 @@ entra_partita:
 	chiudi_thread_client(client_s, NULL);
 gestione_partita:
 //attesa che inizi e apertura mutex
-	HANDLE notizia_attacco = OpenMutex(SYNCHRONIZE, FALSE, richieste->buff);
+	
+	HANDLE notizia_attacco = OpenMutexA(SYNCHRONIZE, FALSE, richieste->buff);
 	strcpy(buff_receive, my_id);//da creare  in thread_partita
 	strcat(buff_receive, "1");
-	HANDLE notizia_letto = OpenMutex(SYNCHRONIZE, FALSE, buff_receive);//da creare in thread_partita
+	HANDLE notizia_letto = OpenMutexA(SYNCHRONIZE, FALSE, buff_receive);//da creare in thread_partita
 	ReleaseMutex(richiesta_scrivi);
 	manda_client(client_s, "entralobby");
-	HANDLE notizia_pronta = OpenMutex(SYNCHRONIZE, FALSE, my_id);
+	HANDLE notizia_pronta = OpenMutexA(SYNCHRONIZE, FALSE, my_id);
 	if (WaitForSingleObject(notizia_pronta, INFINITE) == WAIT_FAILED) { //aspetta che la partita sia iniziata, attendo che il thread_partita abbia preso i giocatori necessari/è passatp il tempo limite di attesa
-		exitThread();
+		ExitThread(0);
 	}
+
+
 	//partita iniziata
 	manda_client(client_s, "disposizione navi");
 	
-	//mando idgiocatori
+
+	
+	//mando  num giocatori
+	_itoa(7, numero, 10);
+	manda_client(client_s, numero);
+	//mando id giocatori
 	for (i = 0; i < notizie->num_giocatori;i++) {
 		manda_client(client_s, notizie->giocatori[i]);
 	}
-	
 	 
 	ret = ricevi_client(client_s, buff_receive);
 	if (ret == 0) {
@@ -359,25 +337,33 @@ mossa = casella + idgiocatore
 	a = notizie->codice;
 	switch (a) {
 	case 1://devo mandare msg   1 + casella + hit(o no) + idgiocatore
-		manda_client(client_s, notizie->codice);
+		_itoa(notizie->codice, numero, 10);
+		manda_client(client_s, numero); //mandiamo il codice
 		manda_client(client_s, notizie->casella);
-		manda_client(client_s, notizie->hit);
+		_itoa(notizie->hit, numero, 10);
+		manda_client(client_s, numero);//mandiamo la hit
 		manda_client(client_s, notizie->idgiocatore);
 		ReleaseMutex(notizia_letto);
 	case 2:
-		manda_client(client_s, notizie->codice);
+		_itoa(notizie->codice, numero, 10);
+		manda_client(client_s, numero);
 		manda_client(client_s, notizie->idgiocatore);
 		ReleaseMutex(notizia_letto);
 	case 3:
-		manda_client(client_s, notizie->codice);
+		_itoa(notizie->codice, numero, 10);
+		manda_client(client_s, numero);
 		manda_client(client_s, notizie->idgiocatore);
 		ReleaseMutex(notizia_letto);
 		if (strcmp(notizie->idgiocatore, my_id) == 0) goto gestione_turno;
 	case 4:
-		manda_client(client_s, notizie->codice);
+		_itoa(notizie->codice, numero, 10);
+		manda_client(client_s, numero);
 		manda_client(client_s, notizie->idgiocatore);
 		goto entra_partita;
 	case 5: //dopo ci arriva hit miss o perso
+		
+		_itoa(notizie->codice, numero, 10);
+		manda_client(client_s, numero);
 		manda_client(client_s, notizie->casella);
 		ret = ricevi_client(client_s, buff_receive);
 		if (ret == 0) {
@@ -402,7 +388,7 @@ mossa = casella + idgiocatore
 
 	default:
 		printf("errore comunicazione.\n");
-		return EXIT_FAILURE;
+		ExitThread(0);
 	}
 	//la disposizione è finita, partita iniziata ufficialmente
  //da mettere controllo
@@ -452,6 +438,42 @@ gestione_turno: //thread partita aspetta che inseriamo la mossa
 
 }
 
+
+
+void accettazione() //funzione del thread_accettazione
+{
+	SOCKET client_s;
+	struct sockaddr_in client_addr;
+	int length;
+	HANDLE thread_client;
+	//int ret;
+
+	Parametri_client* param = (Parametri_client*)malloc(sizeof(Parametri_client));
+	while (1) {
+		length = sizeof(client_addr);
+		client_s = accept(server_s, (struct sockaddr*)&client_addr, &length);
+		if (client_s == INVALID_SOCKET) {
+			printf("errore nella accept\n");
+			continue;
+		}
+		param->server_s = client_s;
+		thread_client = CreateThread(
+			NULL,      // Attributi predefiniti
+			0,         // Dimensione dello stack predefinita
+			funzione_client, // Funzione del thread
+			(LPVOID)param,      // Parametri per la funzione
+			0,         // Esegui il thread immediatamente
+			NULL       // ID del thread
+		);
+
+		printf("connessione effettuata con un client\n");
+	}
+
+
+
+}
+
+
 #define MAX_GIOCATORI 7
 
 
@@ -470,9 +492,9 @@ void partita() //funzione del thread_partita
 
 	/* INIZIALIZZAZIONE VARIABILI */
 	
-	mutex_attacco = CreateMutex(NULL, FALSE, "mutex_attacco");
-	if (mutex_attacco) {
-		printf("errore nella creazione del mutex\n");
+	mutex_attacco = CreateMutexA(NULL, FALSE, "mutex_attacco");
+	if (!mutex_attacco) {
+		printf("errore nella creazione del mutexpartita\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -513,12 +535,12 @@ void partita() //funzione del thread_partita
 		WaitForSingleObject(comunicazione_pronta, INFINITE); // da mettere controlli
 		push_back(nomi_partita, &(richieste->buff));
 		push_back(nomi_in_vita, &(richieste->buff));
-		handle = CreateMutex(NULL, FALSE, &(richieste->buff));
+		handle = CreateMutexA(NULL, FALSE, &(richieste->buff));
 		WaitForSingleObject(handle, INFINITE);
 		push_back(mutex_pronta, &handle);
 		strcpy(&(richieste->buff), nome);
 		strcat(nome, "1");
-		handle = CreateMutex(NULL, FALSE, nome);
+		handle = CreateMutexA(NULL, FALSE, nome);
 		WaitForSingleObject(handle, INFINITE);      //notizia +1
 		push_back(mutex_letta,&handle);
 		ReleaseMutex(comunicazione_letta);
@@ -529,18 +551,18 @@ void partita() //funzione del thread_partita
 	
 	for (int j = 0; j < nomi->count;j++) {
 		read_from(mutex_pronta, j, &handle);
-		handle =ReleaseMutex(handle);
+		ReleaseMutex(handle);
 		
 	}
 	//aspettiamo la disposizione delle navi
 	for (int j = 0; j < nomi->count;j++) {
 		read_from(mutex_letta, j, &handle);
-		handle = WaitForSingleObject(mutex_letta,INFINITE);
+		WaitForSingleObject(mutex_letta,INFINITE);
 	}
 
 	for (int j = 0; j < nomi->count;j++) {
 		read_from(mutex_pronta, j, &handle);
-		handle = ReleaseMutex(handle);
+		ReleaseMutex(handle);
 
 	}
 	int turno = 0;//gestione del turno buffer circolare 
@@ -555,11 +577,11 @@ void partita() //funzione del thread_partita
 	
 	for (int j = 0; j < nomi->count;j++) {//vedere condizioni for
 		read_from(mutex_pronta, j, &handle);
-		handle = ReleaseMutex(handle);
+		ReleaseMutex(handle);
 	}
 	for (int j = 0; j < nomi->count;j++) {
 		read_from(mutex_letta, j, &handle);
-		handle = WaitForSingleObject(mutex_letta, INFINITE);
+		WaitForSingleObject(mutex_letta, INFINITE);
 	}
 	
 	
@@ -578,7 +600,7 @@ void partita() //funzione del thread_partita
 		
 	}
 	read_from(mutex_pronta, i, &handle);
-	ReleaseMutex(&handle, INFINITE);
+	ReleaseMutex(handle);
 	read_from(mutex_letta, i, &handle);
 	WaitForSingleObject(handle, INFINITE);//aspetto mutex letta
 	
@@ -594,18 +616,18 @@ void partita() //funzione del thread_partita
 		//con l'if verifichiamo se l'utente è l'unico rimasto
 		if (nomi_in_vita->count == 1) {
 			//dobbiamo resettare il thread partita per l'inzio di una nuova partita free_vector(struct array* arr) CloseHandle
-			read_from(mutex_pronta, attuale, handle);
-			ReleaseMutex(&handle);
+			read_from(mutex_pronta, attuale, &handle);
+			ReleaseMutex(handle);
 			WaitForSingleObject(mutex_attacco, INFINITE);
 			notizie->codice = 4;
 			//strcpy(id_giocatore)
 			for (int j = 0; j < nomi->count;j++) {
 				read_from(mutex_pronta, j, &handle);
-				handle = ReleaseMutex(handle);
+				ReleaseMutex(handle);
 			}
 			for (int j = 0; j < nomi->count;j++) {
 				read_from(mutex_letta, j, &handle);
-				handle = WaitForSingleObject(mutex_letta, INFINITE);
+				WaitForSingleObject(mutex_letta, INFINITE);
 			}
 			//chiudiamo tutto
 			for (int j = 0; j < nomi->count;j++) {
@@ -623,18 +645,18 @@ void partita() //funzione del thread_partita
 		}
 		
 		//parte costante
-		read_from(mutex_pronta, attuale, handle);
-		ReleaseMutex(&handle);
+		read_from(mutex_pronta, attuale, &handle);
+		ReleaseMutex(handle);
 		WaitForSingleObject(mutex_attacco, INFINITE);
 		notizie->codice = 2;
 		//strcpy(id_giocatore)
 		for (int j = 0; j < nomi->count;j++) {
 			read_from(mutex_pronta, j, &handle);
-			handle = ReleaseMutex(handle);
+			ReleaseMutex(handle);
 		}
 		for (int j = 0; j < nomi->count;j++) {
 			read_from(mutex_letta, j, &handle);
-			handle = WaitForSingleObject(mutex_letta, INFINITE);
+			WaitForSingleObject(mutex_letta, INFINITE);
 		}
 	
 		
@@ -653,31 +675,31 @@ void partita() //funzione del thread_partita
 		//strcpy(id_giocatore)
 		for (int j = 0; j < nomi->count;j++) {
 			read_from(mutex_pronta, j, &handle);
-			handle = ReleaseMutex(handle);
+			ReleaseMutex(handle);
 		}
 		for (int j = 0; j < nomi->count;j++) {
 			read_from(mutex_letta, j, &handle);
-			handle = WaitForSingleObject(mutex_letta, INFINITE);
+			WaitForSingleObject(mutex_letta, INFINITE);
 		}
 
 		turno = (turno + 1) % nomi_in_vita->count;
 		goto gestione_turno_singolo;
 	}
-	else if (notizia->codice == 1) {
+	else if (notizie->codice == 1) {
 
 	
-		read_from(mutex_pronta, attuale, handle);
-		ReleaseMutex(&handle);
+		read_from(mutex_pronta, attuale, &handle);
+		ReleaseMutex(handle);
 		WaitForSingleObject(mutex_attacco, INFINITE);
 		notizie->codice = 1;
 		//strcpy(id_giocatore)
 		for (int j = 0; j < nomi->count;j++) {
 			read_from(mutex_pronta, j, &handle);
-			handle = ReleaseMutex(handle);
+			ReleaseMutex(handle);
 		}
 		for (int j = 0; j < nomi->count;j++) {
 			read_from(mutex_letta, j, &handle);
-			handle = WaitForSingleObject(mutex_letta, INFINITE);
+			WaitForSingleObject(mutex_letta, INFINITE);
 		}
 
 		turno = (turno + 1) % nomi_in_vita->count;
@@ -780,7 +802,7 @@ int main() { //thread-controllo_gestione
 		*********************** SHARED MEM PER IL CONTROLLO*************************
 		*/
 	
-	    hrichieste = CreateFileMapping(
+	    hrichieste = CreateFileMappingA(
 		INVALID_HANDLE_VALUE, // Usa la memoria di paging del sistema
 		NULL,                 // Sicurezza predefinita
 		PAGE_READWRITE,      // Accesso in lettura/scrittura
@@ -813,54 +835,54 @@ int main() { //thread-controllo_gestione
 		mutex = CreateMutex(NULL, FALSE, NULL); HANDLE comunicazione_pronta, comunicazione_letta, partita_iniziata;
 		
 		*/
-	richiesta_pronta = CreateMutex(NULL, FALSE, NULL);
-	if (richiesta_pronta) {
-		printf("errore nella creazione del mutex\n");
+	richiesta_pronta = CreateMutex(NULL, TRUE, NULL);
+	if (!richiesta_pronta) {
+		printf("errore nella creazione del mutex1\n");
 		exit(EXIT_FAILURE);
 	}
 	if (WaitForSingleObject(richiesta_pronta, INFINITE) != WAIT_OBJECT_0) {
-		printf("errore nella gestione del mutex.\n");
+		printf("errore nella gestione del mutex2\n");
 		return EXIT_FAILURE;
 	}
 	
-	richiesta_scrivi = CreateMutex(NULL, FALSE, NULL);
-	if (richiesta_scrivi) {
-		printf("errore nella creazione del mutex\n");
+	richiesta_scrivi = CreateMutexA(NULL, FALSE, NULL);
+	if (!richiesta_scrivi) {
+		printf("errore nella creazione del mutex3\n");
 		exit(EXIT_FAILURE);
 	}
 
-	comunicazione_letta = CreateMutex(NULL, FALSE, NULL);
-	if (comunicazione_letta) {
-		printf("errore nella creazione del mutex\n");
+	comunicazione_letta = CreateMutexA(NULL, FALSE, NULL);
+	if (!comunicazione_letta) {
+		printf("errore nella creazione del mutex4\n");
 		exit(EXIT_FAILURE);
 	}	
 	if (WaitForSingleObject(comunicazione_letta, INFINITE) != WAIT_OBJECT_0) {
-		printf("errore nella gestione del mutex.\n");
+		printf("errore nella gestione del mutex5\n");
 		return EXIT_FAILURE;
 	}
 
-	comunicazione_pronta = CreateMutex(NULL, FALSE, NULL);
-	if (comunicazione_pronta) {
-		printf("errore nella creazione del mutex\n");
+	comunicazione_pronta = CreateMutexA(NULL, FALSE, NULL);
+	if (!comunicazione_pronta) {
+		printf("errore nella creazione del mute6\n");
 		exit(EXIT_FAILURE);
 	}
 	if (WaitForSingleObject(comunicazione_pronta, INFINITE) != WAIT_OBJECT_0) {
-		printf("errore nella gestione del mutex.\n");
+		printf("errore nella gestione del mutex7\n");
 		return EXIT_FAILURE;
 	}
-	partita_iniziata = CreateMutex(NULL, FALSE, NULL);
-	if (partita_iniziata) {
-		printf("errore nella creazione del mutex\n");
+	partita_iniziata = CreateMutexA(NULL, FALSE, NULL);
+	if (!partita_iniziata) {
+		printf("errore nella creazione del mutex8\n");
 		exit(EXIT_FAILURE);
 	}
 
-	mutex_controllo = CreateMutex(NULL, FALSE, NULL);
+	mutex_controllo = CreateMutexA(NULL, FALSE, NULL);
 	if (WaitForSingleObject(mutex_controllo, INFINITE) != WAIT_OBJECT_0) {
 		printf("errore nella gestione del mutex.\n");
 		return EXIT_FAILURE;
 	}
-	if (mutex_controllo) {
-		printf("errore nella creazione del mutex\n");
+	if (!mutex_controllo) {
+		printf("errore nella creazione del mutex9\n");
 		exit(EXIT_FAILURE);
 	}
 	/*
@@ -874,7 +896,6 @@ int main() { //thread-controllo_gestione
 	
 	//creazione del thread-accettazione
 
-	
 	
 	HANDLE thread_accettazione = CreateThread(
 		NULL,      // Attributi predefiniti
@@ -1010,62 +1031,6 @@ struct array {
 	//mutex = CreateMutex(NULL, FALSE, NULL);
 
 
-
-
-
-
-	 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-	
-	while (1) {
-        length = sizeof(client_addr);
-        client_s = accept(server_s, (struct sockaddr*)&client_addr, &length);
-        if (client_s == INVALID_SOCKET) {
-            printf("errore nella accept\n");
-            continue;
-        }
-
-        printf("connessione effettuata con un client\n");
-
-        do {
-            int bytes_received = recv(client_s, buf, BUF_DIM, 0);
-            if (bytes_received > 0) {
-                buf[bytes_received] = '\0';  // Assicurati di terminare la stringa
-                printf("stringa ricevuta: %s\n", buf);
-                send(client_s, "letto", sizeof("letto"), 0);
-            }
-            else {
-                printf("errore nella ricezione o client disconnesso\n");
-                break;  // Uscire dal ciclo se il client si disconnette
-            }
-        } while (strcmp(buf, "quit") != 0);
-
-        closesocket(client_s);
-        printf("client disconnesso\n");
-    }
-
-    closesocket(server_s);
-    WSACleanup();
-    return 0;
 
 
 
