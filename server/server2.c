@@ -235,19 +235,22 @@ richiedi_nome:
 	if (WaitForSingleObject(richiesta_scrivi, INFINITE) == WAIT_FAILED) {
 		ExitThread(0);
 	}
-	
+	printf("preso richiesta_scrivi\n");
 	richieste->codice = 1;
 	strcpy(richieste->buff, buff_receive);
 	ReleaseMutex(richiesta_pronta);
+	printf("rilasciato richiesta_pronta\n");
 	if (WaitForSingleObject(mutex_controllo, INFINITE) == WAIT_FAILED) {
 		ExitThread(0);
 	}
 	if (richieste->codice) {
 		manda_client(client_s, "nonok");
 		ReleaseMutex(richiesta_scrivi);
+		printf("rilasciato richiesta_scrivi\n");
 		goto richiedi_nome;
 	}
 	ReleaseMutex(richiesta_scrivi);
+	printf("rilasciato mutex richiesta_scrivi");
 	manda_client(client_s, "ok");
 	strcpy(my_id, buff_receive);
 entra_partita:
@@ -268,15 +271,19 @@ entra_partita:
 		richieste->codice = 2;
 		strcpy(richieste->buff, my_id);
 		ReleaseMutex(richiesta_pronta);
+		printf("rilasciato mutex richiesta_pronta");
 		if (WaitForSingleObject(mutex_controllo, INFINITE) == WAIT_FAILED) {
 			ExitThread(0);
 		}
 		if (richieste->codice == 0) {
 			manda_client(client_s, "nonok");
 			ReleaseMutex(richiesta_scrivi);
+			printf("rilasciato mutex richiesta_scrivi");
 			goto gestione_partita;
+		
 		}
 		ReleaseMutex(richiesta_scrivi);
+		tentativi++;
 		
 	} while (tentativi < 5);
 	chiudi_thread_client(client_s, NULL);
@@ -366,7 +373,7 @@ mossa = casella + idgiocatore
 		manda_client(client_s, numero);
 		manda_client(client_s, notizie->casella);
 		ret = ricevi_client(client_s, buff_receive);
-		if (ret == 0) {
+		if (ret != 0) {
 			printf("il client ha chiuso la connessione\n");
 			chiudi_thread_client(client_s, NULL);
 		}
@@ -529,7 +536,7 @@ void partita() //funzione del thread_partita
 	creare un mutex con il suo nome+'1' (notizia_letta)
 	mettere nel buffer "notiziaAttacco"
 	*/
-	
+	printf("inizializzazione del thread partita completata\n");
 	do {
 		//ReleaseMutex(partita_iniziata);
 		WaitForSingleObject(comunicazione_pronta, INFINITE); // da mettere controlli
@@ -545,6 +552,7 @@ void partita() //funzione del thread_partita
 		push_back(mutex_letta,&handle);
 		ReleaseMutex(comunicazione_letta);
 		//WaitForSingleObject(partita_iniziata, INFINITE);
+		printf("%s accettato nella partita\n", nome);
 	} while (nomi->count < MAX_GIOCATORI);
 
    	iniziata = true;
@@ -735,6 +743,7 @@ int main() { //thread-controllo_gestione
     int length;
     struct sockaddr_in server_addr, client_addr;
     char buff[BUF_DIM];
+	DWORD ret_mutex;
 
 	//PREPARAZIONE DEL NECESSARIO
 
@@ -776,7 +785,7 @@ int main() { //thread-controllo_gestione
 		PAGE_READWRITE,      // Accesso in lettura/scrittura
 		0,                    // Dimensione massima dell'oggetto (ignora)
 		sizeof(Sharednotizie),   // Dimensione dell'oggetto
-		"MySharedMemory"      // Nome dell'oggetto di memoria condivisa
+		"MySharedMemory1"      // Nome dell'oggetto di memoria condivisa
 	);
 
 	if (hnotizie == NULL) {
@@ -808,7 +817,7 @@ int main() { //thread-controllo_gestione
 		PAGE_READWRITE,      // Accesso in lettura/scrittura
 		0,                    // Dimensione massima dell'oggetto (ignora)
 		sizeof(Sharedrichieste),   // Dimensione dell'oggetto
-		"MySharedMemory"      // Nome dell'oggetto di memoria condivisa
+		"MySharedMemory2"      // Nome dell'oggetto di memoria condivisa
 	);
 
 	if (hrichieste == NULL) {
@@ -835,7 +844,7 @@ int main() { //thread-controllo_gestione
 		mutex = CreateMutex(NULL, FALSE, NULL); HANDLE comunicazione_pronta, comunicazione_letta, partita_iniziata;
 		
 		*/
-	richiesta_pronta = CreateMutex(NULL, TRUE, NULL);
+	richiesta_pronta = CreateMutexA(NULL, FALSE, NULL);
 	if (!richiesta_pronta) {
 		printf("errore nella creazione del mutex1\n");
 		exit(EXIT_FAILURE);
@@ -952,18 +961,36 @@ struct array {
 	void* arr; // the actual array
 	
 	*/
+	int a = 0;
+	printf("thread di controllo operativo\n");
 	while (1) {
-		WaitForSingleObject(richiesta_pronta,INFINITE);
-		int a;
+		ret_mutex = WaitForSingleObject(richiesta_pronta, INFINITE);
+		if (ret_mutex == WAIT_ABANDONED) {
+			printf("WAIT_ABANDONED\n");
+		}
+		else if (ret_mutex == WAIT_OBJECT_0) {
+			printf("WAIT_OBJECT_0\n");
+		}
+		else if (ret_mutex == WAIT_TIMEOUT) {
+			printf("WAIT_TIMEOUT\n");
+		}
+		else if (ret_mutex == WAIT_FAILED) {
+			printf("WAIT_FAILED\n");
+		}
+		 
+		printf("presa in considerazione richiesta, preso richiesta pronta\n");
 		a = richieste->codice;
+		
 		switch (a) {
 		case 1: //inserisci nuovo nome
-			
+			printf("inserendo nuovo nome->");
 			for (int i = 0;i < nomi->count;i++) {
 				read_from(nomi, i, buff);
 				if(strcmp(buff,richieste->buff)== 0){
 					richieste->codice = 1;
 					ReleaseMutex(mutex_controllo);
+					printf("mutex_controllo rilasciato\n");
+					printf("nome rifiutato\n");
 					continue;
 				
 				}
@@ -973,7 +1000,9 @@ struct array {
 
 			push_back(nomi, richieste->buff);
 			richieste->codice = 0;
+			printf("nome accettato: %s\n", richieste->buff);
 			ReleaseMutex(mutex_controllo);
+			printf("mutex_controllo rilasciato");
 			continue;
 		case 2: //entra in partita, se disponibile
 			WaitForSingleObject(partita_iniziata, INFINITE);
@@ -1010,7 +1039,7 @@ struct array {
 	
 	
 	
-	
+		//a = 0;
 	
 	
 	

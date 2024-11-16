@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="tcpserver.c">
+    <ClCompile Include="server2.c">
       <Filter>File di origine</Filter>
     </ClCompile>
   </ItemGroup>

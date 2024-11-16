@@ -315,6 +315,7 @@ richiedi_nome:
 
     if (ricevi_server(ds_sock, buff_receive) == 0) {
         if (strcmp(buff_receive, "ok")) {
+            printf("il none scelto è gia esistente o è stato rifiutato. Riprovare...\n");
             goto richiedi_nome;
         }
     }
