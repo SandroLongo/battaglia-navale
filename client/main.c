@@ -205,7 +205,7 @@ void chiudi_client(SOCKET ds_sock, int status) //funzione che chiude il client f
     exit(status);
 }
 
-SOCKET *socket_connection()
+SOCKET socket_connection()
 {
     SOCKET ds_sock;
     struct sockaddr_in server_addr;
@@ -235,7 +235,7 @@ SOCKET *socket_connection()
         return INVALID_SOCKET;
     }
 
-    return &ds_sock;
+    return ds_sock;
 }
 
 
@@ -275,7 +275,7 @@ int main() {
     //lancio della connessione
     SOCKET ds_sock;
 connection:
-    ds_sock = *socket_connection();
+    ds_sock = socket_connection();
     if (ds_sock == INVALID_SOCKET)
     {
     richiesta_nuovo_tentativo:
