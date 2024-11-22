@@ -155,7 +155,7 @@ typedef struct {
 	int hit;
 	char idgiocatore[20];
 	int num_giocatori;
-	char** giocatori;
+	struct array* giocatori;
 
 } Sharednotizie;
 
@@ -235,11 +235,11 @@ richiedi_nome:
 	if (WaitForSingleObject(richiesta_scrivi, INFINITE) == WAIT_FAILED) {
 		ExitThread(0);
 	}
-	printf("preso richiesta_scrivi\n");
+	//printf("preso richiesta_scrivi\n");
 	richieste->codice = 1;
 	strcpy(richieste->buff, buff_receive);
 	ReleaseSemaphore(richiesta_pronta, 1, NULL);
-	printf("rilasciato richiesta_pronta\n");
+	//printf("rilasciato richiesta_pronta\n");
 	if (WaitForSingleObject(mutex_controllo, INFINITE) == WAIT_FAILED) {
 		ExitThread(0);
 	}
@@ -250,7 +250,7 @@ richiedi_nome:
 		goto richiedi_nome;
 	}
 	ReleaseSemaphore(richiesta_scrivi, 1, NULL);
-	printf("rilasciato mutex richiesta_scrivi");
+	//printf("rilasciato mutex richiesta_scrivi");
 	manda_client(client_s, "ok");
 	strcpy(my_id, buff_receive);
 	printf("id thread client: %s\n", my_id);
@@ -264,7 +264,7 @@ entra_partita:
 		goto entra_partita;
 	}
 	tentativi = 0;
-	printf("riga 266\n");
+	//printf("riga 266\n");
 	do {
 		if (WaitForSingleObject(richiesta_scrivi, INFINITE) == WAIT_FAILED) {
 			
@@ -274,36 +274,42 @@ entra_partita:
 		
 		richieste->codice = 2;
 		strcpy(richieste->buff, my_id);
-		printf("richieste->buff(277): %s\n", richieste->buff);
+		//printf("richieste->buff(277): %s\n", richieste->buff);
 		ReleaseSemaphore(richiesta_pronta, 1, NULL);
-		printf("rilasciato mutex richiesta_pronta(277)\n");
+		//printf("rilasciato mutex richiesta_pronta(277)\n");
 		if (WaitForSingleObject(mutex_controllo, INFINITE) == WAIT_FAILED) {
 			ExitThread(0);
 		}
 		if (richieste->codice == 0) {
-			manda_client(client_s, "entralobby");
 			ReleaseSemaphore(richiesta_scrivi, 1, NULL);
-			printf("rilasciato mutex richiesta_scrivi(284)\n");
+			//printf("rilasciato mutex richiesta_scrivi(284)\n");
 			goto gestione_partita;
 		
 		}
 		manda_client(client_s, "nonok");
+		//printf("sto mandando nonok al client\n");
 		ReleaseSemaphore(richiesta_scrivi, 1, NULL);
-		printf("rilasciato mutex richiesta_scrivi(289)\n");
+		//printf("rilasciato mutex richiesta_scrivi(289)\n");
 		tentativi++;
 		
 	} while (tentativi < 5);
 	chiudi_thread_client(client_s, NULL);
 gestione_partita:
 //attesa che inizi e apertura mutex
-	
+	manda_client(client_s, "entralobby");
+	ret = ricevi_client(client_s, buff_receive);
+	if (ret != 0) {
+		printf("il client ha chiuso la connessione\n");
+		chiudi_thread_client(client_s, NULL);
+	}
 	HANDLE notizia_attacco = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, FALSE, richieste->buff);
 	strcpy(buff_receive, my_id);//da creare  in thread_partita
 	strcat(buff_receive, "1");
 	HANDLE notizia_letto = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, NULL, buff_receive);//da creare in thread_partita
 	ReleaseSemaphore(richiesta_scrivi, 1, NULL);
-	manda_client(client_s, "entralobby");
-	HANDLE notizia_pronta = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, FALSE, my_id);;
+	//manda_client(client_s, "entralobby");
+	HANDLE notizia_pronta = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, FALSE, my_id);
+	//printf("riga 309\n");
 	if (WaitForSingleObject(notizia_pronta, INFINITE) == WAIT_FAILED) { //aspetta che la partita sia iniziata, attendo che il thread_partita abbia preso i giocatori necessari/è passatp il tempo limite di attesa
 		ExitThread(0);
 	}
@@ -311,15 +317,32 @@ gestione_partita:
 
 	//partita iniziata
 	manda_client(client_s, "disposizione navi");
-	
+	ret = ricevi_client(client_s, buff_receive);
+	//printf("mandato disposizione navi.(riga319)\n");
+	if (ret != 0) {
+		printf("il client ha chiuso la connessione\n");
+		chiudi_thread_client(client_s, NULL);
+	}
 
 	
 	//mando  num giocatori
-	_itoa(7, numero, 10);
+	_itoa(3, numero, 10);
 	manda_client(client_s, numero);
+	ret = ricevi_client(client_s, buff_receive);
+	if (ret != 0) {
+		printf("il client ha chiuso la connessione\n");
+		chiudi_thread_client(client_s, NULL);
+	}
 	//mando id giocatori
+	//printf(" riga 337(notizie->num_giocatori) : %d\n", notizie->num_giocatori);
 	for (i = 0; i < notizie->num_giocatori;i++) {
-		manda_client(client_s, notizie->giocatori[i]);
+		read_from(notizie->giocatori,i, buff_send);
+		manda_client(client_s, buff_send);
+		ret = ricevi_client(client_s, buff_receive);
+		if (ret != 0) {
+			printf("il client ha chiuso la connessione\n");
+			chiudi_thread_client(client_s, NULL);
+		}
 	}
 	 
 	ret = ricevi_client(client_s, buff_receive);
@@ -330,10 +353,16 @@ gestione_partita:
 	if (strcmp(buff_receive, "completata") != 0) {
 		chiudi_thread_client(client_s, NULL);
 	}
+	printf("riga 356.\n");
 	ReleaseSemaphore(notizia_letto, 1, NULL);
 	WaitForSingleObject(notizia_pronta, INFINITE);
 	manda_client(client_s, "iniziopartita");
-
+	ret = ricevi_client(client_s, buff_receive);
+	if (ret != 0) {
+		printf("il client ha chiuso la connessione\n");
+		chiudi_thread_client(client_s, NULL);
+	}
+	printf("riga 365.\n");
 
 gestione_notizie:
 	/*   MESSAGGI CLIENT PARTITA-CLIENT SERVER
@@ -488,7 +517,7 @@ void accettazione() //funzione del thread_accettazione
 }
 
 
-#define MAX_GIOCATORI 7
+#define MAX_GIOCATORI 3
 
 
 
@@ -546,26 +575,28 @@ void partita() //funzione del thread_partita
 	printf("inizializzazione del thread partita completata\n");
 	do {
 		//ReleaseMutex(partita_iniziata);
+		printf("pronto a far entrare nuovi giocatori(551)\n");
 		WaitForSingleObject(comunicazione_pronta, INFINITE); // da mettere controlli
-		
 		push_back(nomi_partita, &(richieste->buff));
 		push_back(nomi_in_vita, &(richieste->buff));
-		printf("richieste->buff(553): %s\n", richieste->buff);
+		//printf("richieste->buff(553): %s\n", richieste->buff);
 		handle = CreateSemaphoreA(NULL, 0, 1, richieste->buff);
-		printf("richieste->buff(555): %s\n", richieste->buff);
+		//printf("richieste->buff(555): %s\n", richieste->buff);
 		push_back(mutex_pronta, &handle);
 		strcpy(nome, richieste->buff);
-		printf("richieste->buff(558): %s\n", richieste->buff);
-		printf("nome(559): %s\n", nome);
+		//printf("richieste->buff(558): %s\n", richieste->buff);
+		//printf("nome(559): %s\n", nome);
 		strcat(nome, "1");
 		handle = CreateSemaphoreA(NULL, 0, 1, nome);      //notizia +1
 		push_back(mutex_letta,&handle);
 		ReleaseSemaphore(comunicazione_letta, 1, NULL);
 		//WaitForSingleObject(partita_iniziata, INFINITE);
-		//printf("%s accettato nella partita\n", richieste->buff);
+		printf("%s accettato nella partita\n", richieste->buff);
 	} while (nomi->count < MAX_GIOCATORI);
 
    	iniziata = true;
+	notizie->num_giocatori = MAX_GIOCATORI;
+	notizie->giocatori = nomi_in_vita;
 	
 	for (int j = 0; j < nomi->count;j++) {
 		read_from(mutex_pronta, j, &handle);
@@ -576,11 +607,13 @@ void partita() //funzione del thread_partita
 	for (int j = 0; j < nomi->count;j++) {
 		read_from(mutex_letta, j, &handle);
 		WaitForSingleObject(mutex_letta,INFINITE);
+		printf("semaforo preso %d\n",j);
 	}
 
 	for (int j = 0; j < nomi->count;j++) {
 		read_from(mutex_pronta, j, &handle);
 		ReleaseSemaphore(handle, 1, NULL);
+		printf("semaforo rilasciato %d\n", j);
 
 	}
 	int turno = 0;//gestione del turno buffer circolare 
@@ -754,6 +787,7 @@ int main() { //thread-controllo_gestione
     struct sockaddr_in server_addr, client_addr;
     char buff[BUF_DIM];
 	DWORD ret_mutex;
+	bool controllo;
 
 	//PREPARAZIONE DEL NECESSARIO
 
@@ -1030,7 +1064,7 @@ struct array {
 			printf("WAIT_ABANDONED\n");
 		}
 		else if (ret_mutex == WAIT_OBJECT_0) {
-			printf("WAIT_OBJECT_0\n");
+			//printf("WAIT_OBJECT_0\n");
 		}
 		else if (ret_mutex == WAIT_TIMEOUT) {
 			printf("WAIT_TIMEOUT\n");
@@ -1045,28 +1079,35 @@ struct array {
 		switch (a) {
 		case 1: //inserisci nuovo nome
 			printf("inserendo nuovo nome->");
+			controllo = false;
 			for (int i = 0;i < nomi->count;i++) {
 				read_from(nomi, i, buff);
 				if(strcmp(buff,richieste->buff)== 0){
-					richieste->codice = 1;
-					ReleaseSemaphore(mutex_controllo, 1, NULL);
-					printf("mutex_controllo rilasciato\n");
-					printf("nome rifiutato\n");
+					controllo = true;
 					continue;
 				
 				}
 			
 			
 			}
-
-			push_back(nomi, richieste->buff);
-			richieste->codice = 0;
-			printf("nome accettato: %s\n", richieste->buff);
-			ReleaseSemaphore(mutex_controllo,1,NULL);
-			printf("mutex_controllo rilasciato");
-			continue;
+			if (controllo) {
+				richieste->codice = 1;
+				ReleaseSemaphore(mutex_controllo, 1, NULL);
+				printf("mutex_controllo rilasciato\n");
+				printf("nome rifiutato\n");
+				continue;
+			}
+			else {
+				push_back(nomi, richieste->buff);
+				richieste->codice = 0;
+				printf("nome accettato: %s\n", richieste->buff);
+				ReleaseSemaphore(mutex_controllo, 1, NULL);
+				printf("mutex_controllo rilasciato\n");
+				continue;
+			}
+			
 		case 2: //entra in partita, se disponibile
-			WaitForSingleObject(partita_iniziata, INFINITE);
+			//WaitForSingleObject(partita_iniziata, INFINITE);
 			if (!iniziata) {
 				
 				ReleaseSemaphore(comunicazione_pronta, 1, NULL);

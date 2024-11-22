@@ -109,6 +109,10 @@ int inserisci_nave(struct griglia* griglia, unsigned dim, int riga, int colonna,
     int n, s, e, w;
     int new_riga = riga;
     int new_colonna = colonna;
+    n = 0;
+    s = 0;
+    e = 0;
+    w = 0;
     if (dir == 'n') {
         n = 1;
     }
@@ -315,6 +319,7 @@ richiedi_nome:
 
     if (ricevi_server(ds_sock, buff_receive) == 0) {
         if (strcmp(buff_receive, "ok")) {
+            printf("buff_receive: %s\n", buff_receive);
             printf("il none scelto è gia esistente o è stato rifiutato. Riprovare...\n");
             goto richiedi_nome;
         }
@@ -381,7 +386,7 @@ richiedi_di_giocare:
     se sono arrivato fino a qui significa che non voglio uscire dal gioco e ho mandato correttamente il msg
     Qui attenderò la risposta del server, per vedere se mi farà entrare o devo rimanere in attesa.
     */
-
+    printf("riga 384\n");
     int controllo;
 cerco_di_entrare:   //da mettere controlli
     Sleep(1);
@@ -391,16 +396,25 @@ cerco_di_entrare:   //da mettere controlli
     il server può mandare che la lobby è gia piena, oppure che sono entrato in lobby e aspettiamo altri giocatori,
     */
 
-
-    if (strcmp(buff_receive, "entralobby") != 0 || controllo != 0) goto cerco_di_entrare;
-
+    printf("ricevuto %s riga 395\n", buff_receive);
+    if (strcmp(buff_receive, "entralobby") != 0) {
+        goto cerco_di_entrare;
+    }
+    else if (controllo != 0) {
+        exit(EXIT_FAILURE);
+    }
+    manda_server(ds_sock, "ok");
     //siamo in partita
     printf("in attesa di altri giocatori...\n");
     controllo = ricevi_server(ds_sock, buff_receive);
     if (strcmp(buff_receive, "disposizione navi") != 0 || controllo != 0) {
         printf("qualcosa è andato storto\n");
-        goto cerco_di_entrare;
+        
+        exit(EXIT_FAILURE);
     }
+    printf("%s(riga 411)\n", buff_receive);
+    //printf("riga 411");
+    manda_server(ds_sock, "ok");
     //arrivano i nomi dei giocatori
     int num_giocatori = 0;
     ricevi_server(ds_sock, buff_receive);
@@ -408,13 +422,18 @@ cerco_di_entrare:   //da mettere controlli
     num_giocatori = atoi(buff_receive);
     char** giocatori = malloc(sizeof(char*) * num_giocatori);
     int k;
+    manda_server(ds_sock, "ok");
+    printf("riga 422\n");
+    printf("%d riga423\n", num_giocatori);
+    //riceviamo nomi giocatori(buggato)
     for (k = 0;k < num_giocatori;k++) {
         ricevi_server(ds_sock, &buff_receive);
         strcpy(giocatori + k, buff_receive);
-        printf("%s ", buff_receive);
+        printf("%s\n", buff_receive);
+        manda_server(ds_sock, "ok");
     }
 
-
+    
     printf("Disponi le tue navi!\n");
     unsigned lista[7] = { 2,2,2,3,3,3,4 };
     char** lista2[7] = { "corvetta", "corvetta", "corvetta", "sottomarino", "sottomarino", "sottomarino", "corazzata" };
@@ -428,7 +447,7 @@ cerco_di_entrare:   //da mettere controlli
     metti_casella:
         printf("inserisci casella di partenza: ");
         leggi_stringa(buff_receive);   //da mettere controllo
-        if (converti_input(&buff_receive, &riga, &colonna) == 1) {
+        if (converti_input(&buff_receive, &riga, &colonna) != 1) {
             printf("Scrivere una casella valida.\n");
             goto metti_casella;
         }
@@ -436,7 +455,7 @@ cerco_di_entrare:   //da mettere controlli
     metti_dir:
         leggi_stringa(buff_receive);
         int length = strlen(buff_receive);
-        if (buff_receive[0] != 'n' || buff_receive[0] != 's' || buff_receive[0] != 'w' || buff_receive[0] != 'e' || length > 1) {
+        if (buff_receive[0] != 'n' && buff_receive[0] != 's' && buff_receive[0] != 'w' && buff_receive[0] != 'e' && length > 1) {
             printf("Scrivere una direzione valida.\n");
             goto metti_dir;
         }
@@ -446,18 +465,18 @@ cerco_di_entrare:   //da mettere controlli
             printf("L'inserimento della nave non è andato a buon fine,perfavore riprovare.\n");
             goto metti_casella;
         }
-
+        stampa_griglia(&my_griglia);
     }
 
     strcpy(buff_send, "completata");
     manda_server(ds_sock, buff_send);
     ricevi_server(ds_sock, buff_receive);
-
-    if (strcmp(buff_receive, "iniziopartita")) {
+    manda_server(ds_sock, "ok");
+    if (strcmp(buff_receive, "iniziopartita") !=0) {
         printf("qualcosa è andato storto\n");
         goto connection;
     }
-
+    printf("la partita è iniziata ufficialmente\n");
     //partita inziata ufficialmente
     struct griglia* lista_griglie = malloc(sizeof(struct griglia) * num_giocatori);
     for (int i = 0; i < num_giocatori; i++) {
