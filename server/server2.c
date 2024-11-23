@@ -303,12 +303,15 @@ gestione_partita:
 		chiudi_thread_client(client_s, NULL);
 	}
 	HANDLE notizia_attacco = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, FALSE, richieste->buff);
+	printf("%s ha notizia_attacco: %s\n", my_id, notizia_attacco);
 	strcpy(buff_receive, my_id);//da creare  in thread_partita
 	strcat(buff_receive, "1");
 	HANDLE notizia_letto = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, NULL, buff_receive);//da creare in thread_partita
+	printf("%s ha notizia_letto: %s\n", my_id, notizia_letto);
 	ReleaseSemaphore(richiesta_scrivi, 1, NULL);
 	//manda_client(client_s, "entralobby");
 	HANDLE notizia_pronta = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, FALSE, my_id);
+	printf("%s ha notizia_pronta: %s\n", my_id, notizia_pronta);
 	//printf("riga 309\n");
 	if (WaitForSingleObject(notizia_pronta, INFINITE) == WAIT_FAILED) { //aspetta che la partita sia iniziata, attendo che il thread_partita abbia preso i giocatori necessari/è passatp il tempo limite di attesa
 		ExitThread(0);
@@ -326,7 +329,7 @@ gestione_partita:
 
 	
 	//mando  num giocatori
-	_itoa(3, numero, 10);
+	_itoa(2, numero, 10);
 	manda_client(client_s, numero);
 	ret = ricevi_client(client_s, buff_receive);
 	if (ret != 0) {
@@ -517,7 +520,7 @@ void accettazione() //funzione del thread_accettazione
 }
 
 
-#define MAX_GIOCATORI 3
+#define MAX_GIOCATORI 2
 
 
 
