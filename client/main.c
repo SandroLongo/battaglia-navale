@@ -583,8 +583,9 @@ ricezione_notizie:
         risultato = applica_attacco(&my_griglia, riga, colonna);
         if (risultato == 2) {
             if (my_griglia.count == 19) { //19 nr totale navi
-                printf("hai perso!");
+                printf("hai perso!\n");
                 manda_server(ds_sock, "perso");
+                goto ricezione_notizie;
             }
 
             printf("Sei stato colpito!\n");
@@ -594,7 +595,7 @@ ricezione_notizie:
         }
         else {
             manda_server(ds_sock, "miss");
-            printf("sei stato mancato!\n");
+            printf("Sei stato mancato!\n");
         }
 
         goto ricezione_notizie;
@@ -628,12 +629,6 @@ scelta_azione:
         goto scelta_azione;
     scelta_attacco:
         printf("arrivati in scelta attacco(riga 628)\n");
-        manda_server(ds_sock, buff_send);//mandiamo il nome da attaccare NON BISOGNA MANDARLO QUI MA UNA VOLTA CHE è TUTTO OK
-        controllo = ricevi_server(ds_sock, buff_receive);//aspettiamo ok
-        if (controllo == 1) {
-            printf("il server non risponde\n");
-            goto connection;
-        }
         printf("riga 365\n");
         printf("scegli una casella valida per l'attacco:");
         strcpy(giocatore, buff_send);
@@ -651,8 +646,8 @@ scelta_azione:
         converti_input(casella, &riga, &colonna);
         int i;
         for (i = 0; i < num_giocatori; i++) {
-            if (strcmp(lista_griglie[i].playerid, buff_send) == 0) {
-
+            if (strcmp(lista_griglie[i].playerid, giocatore) == 0) {
+                printf("i:%d riga:%d colonna:%d\n ", i, riga, colonna);
                 if (lista_griglie[i].disp[riga][colonna].hit == 1) {
                     printf("la casella è gia stata attaccata\n");
                     goto scelta_attacco;
@@ -660,21 +655,28 @@ scelta_azione:
                 break;
             }
         }
-
+        manda_server(ds_sock, giocatore);//mandiamo il nome da attaccare 
+        controllo = ricevi_server(ds_sock, buff_receive);//aspettiamo ok
+        if (controllo == 1) {
+            printf("il server non risponde\n");
+            goto connection;
+        }
         //la mossa è valida per l'attacco
-        manda_server(ds_sock, buff_send);
+        manda_server(ds_sock, casella);
         //1 allora è colpito
         //2 allora non é calpito
         //3 giocatore eliminato
         //altro non è colpito
         ricevi_server(ds_sock, buff_receive);
         if (strcmp(buff_receive, "1") == 0) {
+            printf("i:%d riga:%d colonna:%d\n ", i, riga, colonna);
             lista_griglie[i].disp[riga][colonna].hit = 1;
             lista_griglie[i].disp[riga][colonna].status = 1;
             printf("Hai colpito una nave!.\n");
             goto scelta_azione;
         }
         else if (strcmp(buff_receive, "2") == 0) {
+            printf("i:%d riga:%d colonna:%d\n ", i, riga, colonna);
             lista_griglie[i].disp[riga][colonna].hit = 1;
             lista_griglie[i].disp[riga][colonna].status = 0;
             puts("Il colpo è andato a vuoto");
@@ -686,7 +688,7 @@ scelta_azione:
             memmove(lista_griglie + i, lista_griglie + i + 1, (num_giocatori - i - 1) * sizeof(struct griglia));
             memmove(giocatori + i, giocatori + i + 1, (num_giocatori - i - 1) * sizeof(char*));
             num_giocatori -= 1;
-            printf("hai affondato l'ultima nave di %s!!! Il giocatore è stato quindi eliminato", giocatore);
+            printf("hai affondato l'ultima nave di %s!!! Il giocatore è stato quindi eliminato\n", giocatore);
 
             goto scelta_azione;
         }

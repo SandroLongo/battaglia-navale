@@ -799,10 +799,10 @@ void partita() //funzione del thread_partita
 		//con l'if verifichiamo se l'utente è l'unico rimasto
 		if (nomi_in_vita->count == 1) {
 			//dobbiamo resettare il thread partita per l'inzio di una nuova partita free_vector(struct array* arr) CloseHandle
+			notizie->codice = 4;
 			read_from(mutex_pronta, attuale, &handle);
 			ReleaseSemaphore(handle, 1, NULL);
 			WaitForSingleObject(mutex_attacco, INFINITE);
-			notizie->codice = 4;
 			//strcpy(id_giocatore)
 			for (int j = 0; j < nomi->count;j++) {
 				read_from(mutex_pronta, j, &handle);
@@ -831,7 +831,6 @@ void partita() //funzione del thread_partita
 		read_from(mutex_pronta, attuale, &handle);
 		printf("attuale = %d (riga 798)\n", attuale);
 		ReleaseSemaphore(handle, 1, NULL);
-		
 		WaitForSingleObject(mutex_attacco, INFINITE);
 		printf("riga 813 : rilascio di mutex_attacco\n");
 		notizie->codice = 2;
