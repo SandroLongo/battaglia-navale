@@ -1,4 +1,4 @@
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
+ï»¿#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <WinSock2.h>
@@ -10,7 +10,9 @@
 #pragma comment(lib, "ws2_32.lib")
 
 #define PORTNUMBER 25123
-#define BUF_DIM 512
+#define BUF_DIM 512 
+
+//la e con accento (Ã¨) si traduce con ALT232 Ãž  /232
 
 struct casella { //da mettere typedef (alla fine)
     unsigned char status; // presenza di acqua o nave (1 presenza di una parte di nave, 0 altrimenti)
@@ -23,8 +25,44 @@ struct griglia {
     int count;
 };
 
-int converti_input(const char* input, int* riga, int* colonna) { 
-    if (input[0] < 'A' || input[0] > 'J' ||
+	// Controlla che la lunghezza dell'input sia 2 o 3 (es. "A1" o "A10")
+int converti_input(const char* input, int* riga, int* colonna) {
+	if (strlen(input) < 2 || strlen(input) > 3) {
+		printf("Formato di input non valido\n");
+		return 0;
+	}
+
+	// Controlla che la riga sia una lettera valida tra 'A' e 'J'
+	if (input[0] < 'A' || input[0] > 'J') {
+		printf("Riga non valida (deve essere tra 'A' e 'J')\n");
+		return 0;
+	}
+
+	// Controlla se la colonna Ã¨ valida (1-9 o 10)
+	if (input[1] < '1' || input[1] > '9') {
+		printf("Colonna non valida\n");
+		return 0;
+	}
+
+	// Gestione del caso speciale "10"
+	if (input[1] == '1' && input[2] == '0' && input[3] != '\0') {
+		printf("Formato di input non valido\n");
+		return 0;
+	}
+
+	// Conversione della riga e della colonna
+	*riga = input[0] - 'A';  // Converte 'A'-'J' in 0-9
+	*colonna = (input[1] == '1' && input[2] == '0') ? 9 : (input[1] - '1'); // 1-based to 0-based
+
+	return 1; // Input valido
+}
+    
+    
+    
+    
+    
+    
+    /*if (input[0] < 'A' || input[0] > 'J' ||
         input[1] < '1' || (input[1] > '9' && !(input[1] == '1' && input[2] == '0') || input[2] != '\0')) {
             printf("Formato di input non valido\n");
             return 0;
@@ -34,23 +72,24 @@ int converti_input(const char* input, int* riga, int* colonna) {
     *colonna = (input[1] == '1' && input[2] == '0') ? 9 : atoi(&input[1]) - 1;
 
     return 1;
-}  
+    */
+
 
 int applica_attacco(struct griglia *g, int riga, int colonna) {
-    // Controlla se la casella è già stata colpita
+    // Controlla se la casella Ã¨ giÃ  stata colpita
     if (g->disp[riga][colonna].hit == 1) {
-        printf("Casella già colpita! Riprova.\n");
+        printf("Casella giÃ  colpita! Riprova.\n");
         return 1;
     }
     else {
 
-        if (g->disp[riga][colonna].status == 1) { // C'è una nave
+        if (g->disp[riga][colonna].status == 1) { // C'Ã¨ una nave
             g->disp[riga][colonna].hit = 1; // Segna la casella come colpita
             g->count += 1;
             return 2;
         }
-        else { // Non c'è una nave
-            g->disp[riga][colonna].hit = 1; // Anche se non è colpita, la casella è ora colpita
+        else { // Non c'Ã¨ una nave
+            g->disp[riga][colonna].hit = 1; // Anche se non Ã¨ colpita, la casella Ã¨ ora colpita
             return 3;
         }
     }
@@ -73,8 +112,8 @@ void stampa_griglia(struct griglia* g) {
                     printf(" X ");
                 }
                 else {                         // hit = 1, status = 0 (acqua colpita)
-                    printf(" Ø ");
                 }  
+                    printf(" â˜º ");
             }
             else if (g->disp[i][j].status == 1) { //hit = 0, status = 1
                 printf(" = "); //ce la nostra nave
@@ -133,6 +172,7 @@ int inserisci_nave(struct griglia* griglia, unsigned dim, int riga, int colonna,
         }
 		new_riga = new_riga + s - n;
 		new_colonna = new_colonna + e - w;
+        if (new_colonna < 0 || new_colonna > 9 || new_riga < 0 || new_riga > 9) return 1;
     }
 	//piazza 
 	new_riga = riga;
@@ -181,7 +221,7 @@ unsigned long richiedi_numero() //preso dalla slide 208 di calcolatori (togliere
         errno = 0;
         a = strtoul(buf, &endptr, 10);
         if (errno == ERANGE) {
-            printf("il numero è troppo grande\n");
+            printf("il numero Ã¨ troppo grande\n");
             return 0;
         }
         else if (endptr == buf) {
@@ -229,7 +269,7 @@ SOCKET socket_connection()
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORTNUMBER);
-    server_addr.sin_addr.s_addr = inet_addr("192.168.1.106");  // Modifica l'indirizzo se necessario 192.168.1.106 "127.0.0.1"
+    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");  // Modifica l'indirizzo se necessario 192.168.1.106 "127.0.0.1"
 
     // Connessione al server
     if (connect(ds_sock, (SOCKADDR*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
@@ -283,7 +323,7 @@ connection:
     if (ds_sock == INVALID_SOCKET)
     {
     richiesta_nuovo_tentativo:
-        printf("la connessione con il server è fallita, riprovare?[Y/N]:");
+        printf("la connessione con il server Ã¨ fallita, riprovare?[Y/N]:");
         fgets(buff_receive, BUF_DIM, stdin);
         buff_receive[strcspn(buff_receive, "\n")] = '\0';  // Rimuovi il newline
         if (strcmp(buff_receive, "Y") == 0)
@@ -320,7 +360,7 @@ richiedi_nome:
     if (ricevi_server(ds_sock, buff_receive) == 0) {
         if (strcmp(buff_receive, "ok")) {
             printf("buff_receive: %s\n", buff_receive);
-            printf("il none scelto è gia esistente o è stato rifiutato. Riprovare...\n");
+            printf("il none scelto Ã¨ gia esistente o Ã¨ stato rifiutato. Riprovare...\n");
             goto richiedi_nome;
         }
     }
@@ -384,7 +424,7 @@ richiedi_di_giocare:
     }
     /*
     se sono arrivato fino a qui significa che non voglio uscire dal gioco e ho mandato correttamente il msg
-    Qui attenderò la risposta del server, per vedere se mi farà entrare o devo rimanere in attesa.
+    Qui attenderÃ² la risposta del server, per vedere se mi farÃ  entrare o devo rimanere in attesa.
     */
     printf("riga 384\n");
     int controllo;
@@ -393,7 +433,7 @@ cerco_di_entrare:   //da mettere controlli
     controllo = ricevi_server(ds_sock, buff_receive);
 
     /*
-    il server può mandare che la lobby è gia piena, oppure che sono entrato in lobby e aspettiamo altri giocatori,
+    il server puÃ² mandare che la lobby Ã¨ gia piena, oppure che sono entrato in lobby e aspettiamo altri giocatori,
     */
 
     printf("ricevuto %s riga 395\n", buff_receive);
@@ -408,7 +448,7 @@ cerco_di_entrare:   //da mettere controlli
     printf("in attesa di altri giocatori...\n");
     controllo = ricevi_server(ds_sock, buff_receive);
     if (strcmp(buff_receive, "disposizione navi") != 0 || controllo != 0) {
-        printf("qualcosa è andato storto\n");
+        printf("qualcosa Ã¨ andato storto\n");
         
         exit(EXIT_FAILURE);
     }
@@ -439,7 +479,7 @@ cerco_di_entrare:   //da mettere controlli
     char** lista2[7] = { "corvetta", "corvetta", "corvetta", "sottomarino", "sottomarino", "sottomarino", "corazzata" };
     struct griglia my_griglia;
     initializeGrid(&my_griglia, "la mia griglia");
-    printf("per disporre le navi inserire la casella di partenza (lettera-numero) e la direzione verso cui la nave va disposta(N(su)E(destra)W(sinistra)S(giù))\n");
+    printf("per disporre le navi inserire la casella di partenza (lettera-numero) e la direzione verso cui la nave va disposta(N(su)E(destra)W(sinistra)S(giÃ¹))\n");
     printf("esempio: A1 S\n");
     int riga, colonna;
     for (int i = 0; i < 7; i++) {
@@ -462,7 +502,7 @@ cerco_di_entrare:   //da mettere controlli
 
 
         if (inserisci_nave(&my_griglia, lista[i], riga, colonna, buff_receive[0]) != 0) {
-            printf("L'inserimento della nave non è andato a buon fine,perfavore riprovare.\n");
+            printf("L'inserimento della nave non Ã¨ andato a buon fine,perfavore riprovare.\n");
             goto metti_casella;
         }
         stampa_griglia(&my_griglia);
@@ -473,7 +513,7 @@ cerco_di_entrare:   //da mettere controlli
     ricevi_server(ds_sock, buff_receive);
     manda_server(ds_sock, "ok");
     if (strcmp(buff_receive, "iniziopartita") !=0) {
-        printf("qualcosa è andato storto\n");
+        printf("qualcosa Ã¨ andato storto\n");
         goto connection;
     }
     printf("la partita e' iniziata ufficialmente\n");
@@ -541,7 +581,7 @@ ricezione_notizie:
         }
         int i;
         for (i = 0; i < num_giocatori; i++) {
-            if (strcmp(giocatori[i], buff_receive) == 0) {
+            if (strcmp(giocatori+i, buff_receive) == 0) {
                 break;
             }
         }
@@ -562,7 +602,7 @@ ricezione_notizie:
         printf("e' il turno di %s\n", idgiocatore_corrente);
         goto ricezione_notizie;
 
-    case 4: // la partita è finita
+    case 4: // la partita Ã¨ finita
         ricevi_server(ds_sock, buff_receive);
 		manda_server(ds_sock, "ok");
         if (strcmp(buff_receive, my_id) != 0) {
@@ -620,6 +660,7 @@ scelta_azione:
         int j;
         for (j = 0; j < num_giocatori; j++) {
             if (strcmp(giocatori+j, buff_send) == 0) {
+                strcpy(giocatore, buff_send);
                 goto scelta_attacco;
 
             }
@@ -631,14 +672,13 @@ scelta_azione:
         printf("arrivati in scelta attacco(riga 628)\n");
         printf("riga 365\n");
         printf("scegli una casella valida per l'attacco:");
-        strcpy(giocatore, buff_send);
         leggi_stringa(buff_send);
         /*(input[0] < 'A' || input[0] > 'J' ||
         input[1] < '1' || (input[1] > '9' && !(input[1] == '1' && input[2] == '0') || input[2] != '\0'))
         */
         if (buff_send[0] < 'A' || buff_send[0] > 'J' ||
             buff_send[1] < '1' || (buff_send[1] > '9' && !(buff_send[1] == '1' && buff_send[2] == '0') || buff_send[2] != '\0')) {
-            printf("l'input non è valido\n");
+            printf("l'input non Ã¨ valido\n");
             goto scelta_attacco;
         }
         //prima di casella c'era mossa    
@@ -649,24 +689,25 @@ scelta_azione:
             if (strcmp(lista_griglie[i].playerid, giocatore) == 0) {
                 printf("i:%d riga:%d colonna:%d\n ", i, riga, colonna);
                 if (lista_griglie[i].disp[riga][colonna].hit == 1) {
-                    printf("la casella è gia stata attaccata\n");
+                    printf("la casella Ã¨ gia stata attaccata\n");
                     goto scelta_attacco;
                 }
                 break;
             }
         }
         manda_server(ds_sock, giocatore);//mandiamo il nome da attaccare 
+        //printf("%s (riga 659)\n", giocatore);
         controllo = ricevi_server(ds_sock, buff_receive);//aspettiamo ok
         if (controllo == 1) {
             printf("il server non risponde\n");
             goto connection;
         }
-        //la mossa è valida per l'attacco
+        //la mossa Ã¨ valida per l'attacco
         manda_server(ds_sock, casella);
-        //1 allora è colpito
-        //2 allora non é calpito
+        //1 allora Ã¨ colpito
+        //2 allora non Ã© calpito
         //3 giocatore eliminato
-        //altro non è colpito
+        //altro non Ã¨ colpito
         ricevi_server(ds_sock, buff_receive);
         if (strcmp(buff_receive, "1") == 0) {
             printf("i:%d riga:%d colonna:%d\n ", i, riga, colonna);
@@ -679,7 +720,7 @@ scelta_azione:
             printf("i:%d riga:%d colonna:%d\n ", i, riga, colonna);
             lista_griglie[i].disp[riga][colonna].hit = 1;
             lista_griglie[i].disp[riga][colonna].status = 0;
-            puts("Il colpo è andato a vuoto");
+            puts("Il colpo Ã¨ andato a vuoto");
             goto ricezione_notizie;
 
         }
@@ -688,7 +729,7 @@ scelta_azione:
             memmove(lista_griglie + i, lista_griglie + i + 1, (num_giocatori - i - 1) * sizeof(struct griglia));
             memmove(giocatori + i, giocatori + i + 1, (num_giocatori - i - 1) * sizeof(char*));
             num_giocatori -= 1;
-            printf("hai affondato l'ultima nave di %s!!! Il giocatore è stato quindi eliminato\n", giocatore);
+            printf("hai affondato l'ultima nave di %s!!! Il giocatore Ã¨ stato quindi eliminato\n", giocatore);
 
             goto scelta_azione;
         }
@@ -751,7 +792,7 @@ scelta_azione:
 |
  6- quit (inteso che esce proprio dalla partita)
  
-1(A1)-->client buf[1]= 1->questa è una mossa
+1(A1)-->client buf[1]= 1->questa Ã¨ una mossa
 
 
 

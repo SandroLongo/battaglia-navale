@@ -305,7 +305,7 @@ gestione_partita:
 	HANDLE notizia_attacco = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, FALSE, richieste->buff);
 	//printf("%s ha notizia_attacco: %s\n", my_id, richieste->buff);
 	strcpy(buff_receive, my_id);//da creare  in thread_partita
-	strcat(buff_receive, "1");
+	strcat(buff_receive, "123456789123456789123456789");
 	HANDLE notizia_letto = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, NULL, buff_receive);//da creare in thread_partita
 	//printf("%s ha notizia_letto: %s\n", my_id, buff_receive);
 	HANDLE notizia_pronta = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, FALSE, my_id);
@@ -331,7 +331,7 @@ gestione_partita:
 
 	
 	//mando  num giocatori
-	_itoa(2, numero, 10);
+	_itoa(3, numero, 10);
 	manda_client(client_s, numero);
 	ret = ricevi_client(client_s, buff_receive);
 	if (ret != 0) {
@@ -425,12 +425,14 @@ mossa = casella + idgiocatore
 		_itoa(notizie->codice, numero, 10);
 		manda_client(client_s, numero);
 		printf("%s mandato %s\n", my_id, numero);
+		ret = ricevi_client(client_s, buff_receive);
 		if (ret != 0) {
 			printf("il client ha chiuso la connessione\n");
 			chiudi_thread_client(client_s, NULL);
 		}
 		manda_client(client_s, notizie->idgiocatore);
 		printf("%s mandato %s\n", my_id, notizie->idgiocatore);
+		ret = ricevi_client(client_s, buff_receive);
 		if (ret != 0) {
 			printf("il client ha chiuso la connessione\n");
 			chiudi_thread_client(client_s, NULL);
@@ -547,7 +549,7 @@ gestione_turno: //thread partita aspetta che inseriamo la mossa
 		notizie->codice = 1;
 		notizie->hit = 1;
 		ReleaseSemaphore(notizia_attacco, 1, NULL);//abbiamo scritto una notizia
-		rintf("%s rilasciato notizia attacco\n", my_id);
+		printf("%s rilasciato notizia attacco\n", my_id);
 		WaitForSingleObject(notizia_pronta, INFINITE);
 		ReleaseSemaphore(notizia_letto, 1, NULL);// aspetto che tutti leggano il mio msg
 		goto gestione_turno;
@@ -573,7 +575,7 @@ gestione_turno: //thread partita aspetta che inseriamo la mossa
 		}
 		notizie->codice = 2;
 		ReleaseSemaphore(notizia_attacco, 1, NULL);
-		rintf("%s rilasciato notizia attacco\n", my_id);
+		printf("%s rilasciato notizia attacco\n", my_id);
 		WaitForSingleObject(notizia_pronta, INFINITE);
 		ReleaseSemaphore(notizia_letto, 1, NULL);
 		goto gestione_turno;
@@ -586,7 +588,7 @@ gestione_turno: //thread partita aspetta che inseriamo la mossa
 		notizie->codice = 4;
 		strcpy(notizie->idgiocatore, my_id);
 		ReleaseSemaphore(notizia_attacco, 1, NULL);
-		rintf("%s rilasciato notizia attacco\n", my_id);
+		printf("%s rilasciato notizia attacco\n", my_id);
 		WaitForSingleObject(notizia_pronta, INFINITE);
 		ReleaseSemaphore(notizia_letto, 1, NULL);
 		goto entra_partita;
@@ -634,7 +636,7 @@ void accettazione() //funzione del thread_accettazione
 }
 
 
-#define MAX_GIOCATORI 2
+#define MAX_GIOCATORI 3
 
 
 
@@ -700,17 +702,17 @@ void partita() //funzione del thread_partita
 		handle = CreateSemaphoreA(NULL, 0, 1, richieste->buff);
 		//printf("richieste->buff(555): %s\n", richieste->buff);
 		push_back(mutex_pronta, &handle);
+		printf("%s accettato nella partita\n", richieste->buff);
 		strcpy(nome, richieste->buff);
 		//printf("richieste->buff(558): %s\n", richieste->buff);
 		//printf("nome(559): %s\n", nome);
-		strcat(nome, "1");
+		strcat(nome, "123456789123456789123456789");
 		handle = CreateSemaphoreA(NULL, 0, 1, nome);      //notizia +1
 		push_back(mutex_letta,&handle);
 		strcpy(richieste->buff, "partita");
 		ReleaseSemaphore(comunicazione_letta, 1, NULL);
 		//WaitForSingleObject(partita_iniziata, INFINITE);
-		printf("%s accettato nella partita\n", richieste->buff);
-	} while (nomi->count < MAX_GIOCATORI);
+	} while (nomi_partita->count < MAX_GIOCATORI);
 
    	iniziata = true;
 	notizie->num_giocatori = MAX_GIOCATORI;
@@ -798,7 +800,7 @@ void partita() //funzione del thread_partita
 		extract_from(nomi_in_vita, i, nome);
 		//con l'if verifichiamo se l'utente è l'unico rimasto
 		if (nomi_in_vita->count == 1) {
-			//dobbiamo resettare il thread partita per l'inzio di una nuova partita free_vector(struct array* arr) CloseHandle
+			//dobbiamo resettare il thread partita per l'inzio di una nuova partita free_vector(struct array* arr) CloseHandle	
 			notizie->codice = 4;
 			read_from(mutex_pronta, attuale, &handle);
 			ReleaseSemaphore(handle, 1, NULL);
@@ -1368,7 +1370,10 @@ MESSAGGI AL THREAD CONTROLLO
    
    
    
-
+ULTIME COSE DA FARE
+-far iniziare piu partite consecutivamente con successo
+-far iniziare piu partite contemporaneamente(optional)
+-togliere nomi se un client si disconnette
 
 
 */
