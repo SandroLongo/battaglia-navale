@@ -12,9 +12,8 @@
 #define PORTNUMBER 25123
 #define BUF_DIM 512 
 
-//la e con accento (è) si traduce con ALT232 Þ  /232
 
-struct casella { //da mettere typedef (alla fine)
+struct casella { 
     unsigned char status; // presenza di acqua o nave (1 presenza di una parte di nave, 0 altrimenti)
     unsigned char hit;// nave colpita o meno (1 per colpita, 0 altrimenti)
 };
@@ -25,35 +24,34 @@ struct griglia {
     int count;
 };
 
-	// Controlla che la lunghezza dell'input sia 2 o 3 (es. "A1" o "A10")
+	 
 int converti_input(const char* input, int* riga, int* colonna) {
 	if (strlen(input) < 2 || strlen(input) > 3) {
 		printf("Formato di input non valido\n");
 		return 0;
 	}
 
-	// Controlla che la riga sia una lettera valida tra 'A' e 'J'
+	 
 	if (input[0] < 'A' || input[0] > 'J') {
 		printf("Riga non valida (deve essere tra 'A' e 'J')\n");
 		return 0;
 	}
 
-	// Controlla se la colonna è valida (1-9 o 10)
+	 
 	if (input[1] < '1' || input[1] > '9') {
 		printf("Colonna non valida\n");
 		return 0;
 	}
 
-	// Gestione del caso speciale "10"
+	 
 	if (input[1] == '1' && input[2] == '0' && input[3] != '\0') {
 		printf("Formato di input non valido\n");
 		return 0;
 	}
 
-	// Conversione della riga e della colonna
-	*riga = input[0] - 'A';  // Converte 'A'-'J' in 0-9
-	*colonna = (input[1] == '1' && input[2] == '0') ? 9 : (input[1] - '1'); // 1-based to 0-based
-
+	 
+	*riga = input[0] - 'A';   
+	*colonna = (input[1] == '1' && input[2] == '0') ? 9 : (input[1] - '1'); 
 	return 1; // Input valido
 }
     
@@ -61,18 +59,6 @@ int converti_input(const char* input, int* riga, int* colonna) {
     
     
     
-    
-    /*if (input[0] < 'A' || input[0] > 'J' ||
-        input[1] < '1' || (input[1] > '9' && !(input[1] == '1' && input[2] == '0') || input[2] != '\0')) {
-            printf("Formato di input non valido\n");
-            return 0;
-    }
-
-    *riga = (int)(input[0] - 'A');
-    *colonna = (input[1] == '1' && input[2] == '0') ? 9 : atoi(&input[1]) - 1;
-
-    return 1;
-    */
 
 
 int applica_attacco(struct griglia *g, int riga, int colonna) {
@@ -112,8 +98,9 @@ void stampa_griglia(struct griglia* g) {
                     printf(" X ");
                 }
                 else {                         // hit = 1, status = 0 (acqua colpita)
+					printf(" O ");
                 }  
-                    printf(" ☺ ");
+                   
             }
             else if (g->disp[i][j].status == 1) { //hit = 0, status = 1
                 printf(" = "); //ce la nostra nave
@@ -127,16 +114,13 @@ void stampa_griglia(struct griglia* g) {
 }
 
 
-//aleip : 192.168.1.106 (ipv4)
-// ip seli 87.20.233.29
-
-
+ 
 
 void initializeGrid(struct griglia* g, char *playerid) {
     for (int i = 0; i < 10; i++) {
         for (int j = 0; j < 10; j++) {
-            g->disp[i][j].status = 0; // No ship
-            g->disp[i][j].hit = 0;    // Not hit
+            g->disp[i][j].status = 0; 
+            g->disp[i][j].hit = 0;   
         }
     }
     strcpy(g->playerid , playerid);
@@ -204,7 +188,7 @@ int  leggi_stringa(char* str)
 
 
 
-unsigned long richiedi_numero() //preso dalla slide 208 di calcolatori (togliere prima di far vedere al professore)
+unsigned long richiedi_numero() 
 {
     unsigned long a;
     char buf[BUF_DIM];
@@ -239,9 +223,9 @@ unsigned long richiedi_numero() //preso dalla slide 208 di calcolatori (togliere
 }
 
 
-void chiudi_client(SOCKET ds_sock, int status) //funzione che chiude il client facendo tutte le cose necessarie senza che le dobbiamo ripetere ogni volta
+void chiudi_client(SOCKET ds_sock, int status)  
 { 
-    if ((ds_sock != NULL) & (ds_sock != INVALID_SOCKET)) {  // da pensare se il socket va salvato in una variabile globale per evitare di passarlo come parametro (ma penso che vada bene cosi)
+    if ((ds_sock != NULL) & (ds_sock != INVALID_SOCKET)) {   
         closesocket(ds_sock);
     }
     WSACleanup();
@@ -269,7 +253,7 @@ SOCKET socket_connection()
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORTNUMBER);
-    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");  // Modifica l'indirizzo se necessario 192.168.1.106 "127.0.0.1"
+    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");  
 
     // Connessione al server
     if (connect(ds_sock, (SOCKADDR*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
@@ -299,7 +283,7 @@ int manda_server(int sock,char* buff) {
 int ricevi_server(int sock,char* buf) {
 	int bytes_received = recv(sock, buf, BUF_DIM, 0);
     if (bytes_received > 0) {
-        buf[bytes_received] = '\0';  // Assicurati di terminare la stringa
+        buf[bytes_received] = '\0';   
         return 0;
     }
     else if (bytes_received <= 0) return 1;
@@ -314,8 +298,8 @@ int main() {
         printf("Errore nella WSAStartup\n");
         exit(EXIT_FAILURE);
     }
-    char buff_send[BUF_DIM]; //(buff)
-    char buff_receive[BUF_DIM]; //(buf)
+    char buff_send[BUF_DIM];  
+    char buff_receive[BUF_DIM];  
     //lancio della connessione
     SOCKET ds_sock;
 connection:
@@ -325,7 +309,7 @@ connection:
     richiesta_nuovo_tentativo:
         printf("la connessione con il server è fallita, riprovare?[Y/N]:");
         fgets(buff_receive, BUF_DIM, stdin);
-        buff_receive[strcspn(buff_receive, "\n")] = '\0';  // Rimuovi il newline
+        buff_receive[strcspn(buff_receive, "\n")] = '\0';   
         if (strcmp(buff_receive, "Y") == 0)
         {
             printf("riprovando la connessione...\n");
@@ -410,8 +394,8 @@ richiedi_di_giocare:
 
         if (tentativi == max_tentativi) {
             printf("impossibile mandare il msg...riconnessione con il server.\n");
-            //chiudi_client(ds_sock, EXIT_FAILURE);
-            goto connection; //altrimenti possiamo chiudere la connessione con il server (e magari poi tentare di riconnetterci)
+             
+            goto connection;  
         }
 
 
@@ -426,9 +410,8 @@ richiedi_di_giocare:
     se sono arrivato fino a qui significa che non voglio uscire dal gioco e ho mandato correttamente il msg
     Qui attenderò la risposta del server, per vedere se mi farà entrare o devo rimanere in attesa.
     */
-    printf("riga 384\n");
     int controllo;
-cerco_di_entrare:   //da mettere controlli
+cerco_di_entrare:  
     Sleep(1);
     controllo = ricevi_server(ds_sock, buff_receive);
 
@@ -436,7 +419,6 @@ cerco_di_entrare:   //da mettere controlli
     il server può mandare che la lobby è gia piena, oppure che sono entrato in lobby e aspettiamo altri giocatori,
     */
 
-    printf("ricevuto %s riga 395\n", buff_receive);
     if (strcmp(buff_receive, "entralobby") != 0) {
         goto cerco_di_entrare;
     }
@@ -452,8 +434,6 @@ cerco_di_entrare:   //da mettere controlli
         
         exit(EXIT_FAILURE);
     }
-    printf("%s(riga 411)\n", buff_receive);
-    //printf("riga 411");
     manda_server(ds_sock, "ok");
     //arrivano i nomi dei giocatori
     int num_giocatori = 0;
@@ -463,9 +443,8 @@ cerco_di_entrare:   //da mettere controlli
     char** giocatori = malloc(sizeof(char*) * num_giocatori);
     int k;
     manda_server(ds_sock, "ok");
-    printf("riga 422\n");
-    printf("%d riga423\n", num_giocatori);
-    //riceviamo nomi giocatori(buggato)
+   
+    //riceviamo nomi giocatori
     for (k = 0;k < num_giocatori;k++) {
         ricevi_server(ds_sock, &buff_receive);
         strcpy(giocatori + k, buff_receive);
@@ -479,14 +458,15 @@ cerco_di_entrare:   //da mettere controlli
     char** lista2[7] = { "corvetta", "corvetta", "corvetta", "sottomarino", "sottomarino", "sottomarino", "corazzata" };
     struct griglia my_griglia;
     initializeGrid(&my_griglia, "la mia griglia");
-    printf("per disporre le navi inserire la casella di partenza (lettera-numero) e la direzione verso cui la nave va disposta(N(su)E(destra)W(sinistra)S(giù))\n");
+    printf("per disporre le navi inserire la casella di partenza (lettera-numero) e la direzione verso cui la nave va disposta(N(su)E(destra)W(sinistra)S(giu'))\n");
     printf("esempio: A1 S\n");
+	stampa_griglia(&my_griglia);
     int riga, colonna;
     for (int i = 0; i < 7; i++) {
         printf("inserisci %s (%u caselle)\n", lista2[i], lista[i]);
     metti_casella:
         printf("inserisci casella di partenza: ");
-        leggi_stringa(buff_receive);   //da mettere controllo
+        leggi_stringa(buff_receive);   
         if (converti_input(&buff_receive, &riga, &colonna) != 1) {
             printf("Scrivere una casella valida.\n");
             goto metti_casella;
@@ -510,6 +490,7 @@ cerco_di_entrare:   //da mettere controlli
 
     strcpy(buff_send, "completata");
     manda_server(ds_sock, buff_send);
+    printf("attendendo il posizionamento delle navi da parte degli altri giocatori...\n");
     ricevi_server(ds_sock, buff_receive);
     manda_server(ds_sock, "ok");
     if (strcmp(buff_receive, "iniziopartita") !=0) {
@@ -519,11 +500,9 @@ cerco_di_entrare:   //da mettere controlli
     printf("la partita e' iniziata ufficialmente\n");
     //partita inziata ufficialmente
     struct griglia* lista_griglie = malloc(sizeof(struct griglia) * num_giocatori);
-    printf("malloc fatta\n");
     for (int i = 0; i < num_giocatori; i++) {
         initializeGrid(lista_griglie + i, giocatori + i);
     }
-    //printf("riga485\n");
     //analisi di ricezione notizie
     /*
     costruzione messaggi da server (in partita, dal punto 5)
@@ -543,14 +522,12 @@ cerco_di_entrare:   //da mettere controlli
     char casella[20] ;
     //int turno; //indice gicoatore che ha turno  da fare (sapere chi ha attaccato chi)
 ricezione_notizie:
-    printf("attendendo notizie\n");
     ricevi_server(ds_sock, buff_receive);
-    printf("arrivata notizia con codice %s\n", buff_receive);
     manda_server(ds_sock, "ok");
     a = atoi(buff_receive);
     switch (a) {
     case 1:
-        ricevi_server(ds_sock, buff_receive); //ci arrvva la casella
+        ricevi_server(ds_sock, buff_receive); //ci arriva la casella
 		manda_server(ds_sock, "ok");
         converti_input(buff_receive, &riga, &colonna);
         strcpy(casella, buff_receive); // salviamo la casella dove si vuole attaccare
@@ -574,10 +551,12 @@ ricezione_notizie:
     case 2:
         ricevi_server(ds_sock, buff_receive);
 		manda_server(ds_sock, "ok");
-        printf("%s e' stato eliminato, bye bye  !\n", buff_receive);
         if (strcmp(buff_receive, my_id) == 0) {
-            printf("sei  tu.. :/ \n");
+            printf("sei stato eliminato :/ \n");
 
+        }
+        else {
+            printf("%s e' stato eliminato, bye bye !\n", buff_receive);
         }
         int i;
         for (i = 0; i < num_giocatori; i++) {
@@ -592,13 +571,12 @@ ricezione_notizie:
 
     case 3:
         ricevi_server(ds_sock, buff_receive);
-        //printf("case 3 riga 553:%s", buff_receive);
 		manda_server(ds_sock, "ok");
         if (strcmp(buff_receive, my_id) == 0) {
             goto gestione_turno;
         }
         strcpy(idgiocatore_corrente, buff_receive);
-        //printf("case 3 riga 559:%s", idgiocatore_corrente);
+      
         printf("e' il turno di %s\n", idgiocatore_corrente);
         goto ricezione_notizie;
 
@@ -652,8 +630,8 @@ gestione_turno:
     printf("E'il tuo turno!\n");
 scelta_azione:
     printf("Scegli cosa vuoi fare.\n");
-    printf("1-prepara mossa\n2-stampa griglie\n"); //da mettere anche l'opzione quit
-    unsigned long int numero = richiedi_numero(); //da mettere controlli
+    printf("1-prepara mossa\n2-stampa griglie\n"); 
+    unsigned long int numero = richiedi_numero(); 
     if (numero == 1) {
         printf("scegli il giocatore da attaccare:");
         leggi_stringa(buff_send);
@@ -668,14 +646,9 @@ scelta_azione:
         }
         printf("non esiste un giocatore con quel nome\n");
         goto scelta_azione;
-    scelta_attacco:
-        printf("arrivati in scelta attacco(riga 628)\n");
-        printf("riga 365\n");
+        scelta_attacco:
         printf("scegli una casella valida per l'attacco:");
         leggi_stringa(buff_send);
-        /*(input[0] < 'A' || input[0] > 'J' ||
-        input[1] < '1' || (input[1] > '9' && !(input[1] == '1' && input[2] == '0') || input[2] != '\0'))
-        */
         if (buff_send[0] < 'A' || buff_send[0] > 'J' ||
             buff_send[1] < '1' || (buff_send[1] > '9' && !(buff_send[1] == '1' && buff_send[2] == '0') || buff_send[2] != '\0')) {
             printf("l'input non è valido\n");
@@ -687,7 +660,6 @@ scelta_azione:
         int i;
         for (i = 0; i < num_giocatori; i++) {
             if (strcmp(lista_griglie[i].playerid, giocatore) == 0) {
-                printf("i:%d riga:%d colonna:%d\n ", i, riga, colonna);
                 if (lista_griglie[i].disp[riga][colonna].hit == 1) {
                     printf("la casella è gia stata attaccata\n");
                     goto scelta_attacco;
@@ -696,7 +668,6 @@ scelta_azione:
             }
         }
         manda_server(ds_sock, giocatore);//mandiamo il nome da attaccare 
-        //printf("%s (riga 659)\n", giocatore);
         controllo = ricevi_server(ds_sock, buff_receive);//aspettiamo ok
         if (controllo == 1) {
             printf("il server non risponde\n");
@@ -710,7 +681,6 @@ scelta_azione:
         //altro non è colpito
         ricevi_server(ds_sock, buff_receive);
         if (strcmp(buff_receive, "1") == 0) {
-            printf("i:%d riga:%d colonna:%d\n ", i, riga, colonna);
             lista_griglie[i].disp[riga][colonna].hit = 1;
             lista_griglie[i].disp[riga][colonna].status = 1;
             printf("Hai colpito una nave!.\n");
@@ -762,44 +732,6 @@ scelta_azione:
     exit(EXIT_FAILURE);
 }
 
-
-/* 
- receive(&buffer)
- if( strcmp(buffer[1],"2"){
- //gestisci turno
- else if (strcmp(buff[1], "1")){
- //gestisci mossa
- int = i+1
- segnale
- int = a +2
- else if( strcmp(&buffer,"Hai vinto")
- //fine partita
- else if(strcmp(&buffer,"hai perso"){
- ha vinto alessandro
- return 
-
-
- sigint(cntrl c){
- //esce dalla partita
- \
-|
-|
-|3
-\\\\\\\segnale()
-|4
-|
-|
-|
- 6- quit (inteso che esce proprio dalla partita)
- 
-1(A1)-->client buf[1]= 1->questa è una mossa
-
-
-
-
-
-
-*/
 
 /*
 REQUIREMENTS
@@ -872,24 +804,3 @@ ricevi informazioni dal server
 
 
 
-/* parte da copiare per la struttura della ricezione dei messaggi
-do {
-	printf("Inserisci un messaggio (o 'quit' per terminare): ");
-	fgets(buff, BUF_DIM, stdin);
-	buff[strcspn(buff, "\n")] = '\0';  // Rimuovi il newline
-
-	// Invia il messaggio al server
-	send(ds_sock, buff, strlen(buff), 0);
-
-	//  risposta dal server
-	int bytes_received = recv(ds_sock, buf, BUF_DIM, 0);
-	if (bytes_received > 0) {
-		buf[bytes_received] = '\0';  // Assicurati di terminare la stringa
-		printf("Risposta dal server: %s\n", buf);
-	}
-} while (strcmp(buff, "quit") != 0);
-*/
-
-// Chiusura del socket
-//chiudi_client(ds_sock, EXIT_SUCCESS);
-//return 0;
